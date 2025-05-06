@@ -1,0 +1,120 @@
+---
+title: "Leaf counts on flower stalks"
+author: 'Cindy, Anna, Maria'
+date: "May 2025"
+output:
+  word_document:
+    toc: true
+  pdf_document:
+    toc: true
+  html_document:
+    collapsed: false
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+    smooth_scroll: true
+    theme: sandstone
+    toc: true
+    toc_float: true
+---
+
+```{=html}
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 13px;
+  }
+td {  /* Table  */
+  font-size: 13px;
+}
+h1.title {
+  font-size: 24px;
+  color: Black;
+}
+h1 { /* Header 1 */
+  font-size: 19px;
+  color: Black;
+}
+h2 { /* Header 2 */
+    font-size: 15px;
+  color: Black;
+}
+h3 { /* Header 3 */
+    font-size: 15px;
+  color: Black;
+}
+</style>
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(cache=FALSE)
+options(max.print=23)
+library(rstan)
+library(here);library(dplyr); library(stringr)
+library(ggplot2)
+library(tidyverse)
+library(bayesplot)
+library(patchwork)
+library(hues)
+```
+
+
+## Raw data 
+
+```{r}
+# Load the data
+
+data <- read.csv(here('data','leaf_counts.csv'), header = TRUE, sep = ",")
+data$label = "raw data"
+
+dput(data)
+
+ggplot(data) +
+  geom_histogram(aes(x = number), binwidth = 1,alpha = 0.3, colour = "darkgreen", fill = "darkgreen", alpha = 0.2) +
+  #add mean line
+  geom_vline(aes(xintercept = mean(number)), color = "black", linetype = "dashed", size = 1) +
+  #add variance line
+  geom_vline(aes(xintercept = var(number)), color = "red", linetype = "dashed", size = 1) +
+  #plot poisson distribution
+  geom_histogram(data = data.frame(number = rpois(53, lambda = 16)), aes(x = number), alpha = 0.2) +
+  labs(title = "Leaf counts on flower stalks",
+       x = "Number of leaves",
+       y = "Count") +
+  theme_classic()+
+  theme(legend.position = "right")
+
+ggsave(here('figures','leaf_counts.png'), width = 8, height = 5, dpi = 300)
+
+
+```
+
+## Expected Distributions
+
+```{r}
+
+# poisson distribution
+
+data_pois <- data.frame(number = rpois(n = 53, lambda = 17))
+ggplot(data_pois) +
+  geom_histogram(aes(x = number), binwidth = 1,alpha = 0.3, colour = "darkgreen") +
+  labs(title = "Poisson distribution",
+       x = "Number of leaves",
+       y = "Count") +
+  theme_classic()
+
+# negative binomial distribution
+
+data_nb <- data.frame(number = rnbinom(n = 53, size = 10, prob = 0.4))
+
+ggplot(data_nb) +
+  geom_histogram(aes(x = number), binwidth = 1, alpha = 0.3, colour = "darkgreen") +
+  labs(title = "Negative binomial distribution",
+       x = "Number of leaves",
+       y = "Count") +
+  theme_classic()
+
+
+
+```
+

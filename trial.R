@@ -1,0 +1,10 @@
+library(rstan)
+
+example(stan_model, package = "rstan", run.dontrun = TRUE)
+
+
+install.packages(c("vegan", 
+                   "palmerpenguins", 
+                   "tidybayes",
+                   "tidyverse",
+                   "posterior"))
