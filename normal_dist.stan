@@ -1,0 +1,30 @@
+data {
+  int<lower=0> N;
+  vector[N] measurements;
+}
+
+parameters {
+  real mu;
+  real<lower=0> sigma;
+  
+}
+
+model {
+  mu ~ normal(15, 3);
+  sigma ~ exponential(1);
+  //likelihood
+  measurements ~ normal(mu, sigma);
+  
+}
+//generate datasets from the sampled mean and sigma
+generated quantities {
+  vector[N] yrep;
+  for(i in 1:N){
+    yrep[i] = normal_rng(mu,sigma);
+  }
+}
+
+
+
+
+

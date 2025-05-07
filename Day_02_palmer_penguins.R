@@ -1,0 +1,130 @@
+library(palmerpenguins)
+library(tidyverse)
+library(rstan)
+rstan_options("auto_write" = TRUE)
+options(mc.cores = parallel::detectCores())
+library(tidybayes)
+
+
+penguins %>% 
+  ggplot()+
+  geom_histogram(aes(x = bill_depth_mm), binwidth  = 0.5, 
+                 alpha = 0.3, colour = "darkred", alpha = 0.2)
+
+prior_mean <- rnorm(1,17.5,2)
+prior_sd <- rexp(1,1)
+
+ggplot(data.frame(value = rnorm(300, prior_mean, prior_sd))) +
+  geom_histogram(aes(x = value), binwidth = 0.5, 
+                 alpha = 0.3, colour = "darkred", alpha = 0.2) +
+  xlim(0, 25) +
+  labs(title = "Prior predictive check",
+       x = "Bill depth (mm)",
+       y = "Count") +
+  theme_classic()
+
+penguins_nobillNA <- penguins %>% 
+  drop_na(bill_depth_mm)
+
+normal_dist <- stan_model(file = "normal_dist.stan")
+
+list_bill_depth <- list(
+  N = nrow(penguins_nobillNA),
+  measurements = penguins_nobillNA$bill_depth_mm
+)
+
+normal_dist_sampling <- rstan::sampling(object = normal_dist,
+                                        data = list_bill_depth,
+                                        refresh = 1000L,
+                                        iter = 2000L,
+                                        chains = 4L,
+                                        warmup = 1000L,
+                                        thin = 1L)
+bayesplot::mcmc_areas(normal_dist_sampling, pars = "mu")
+bayesplot::mcmc_areas(normal_dist_sampling, pars = "sigma")
+
+
+#posterior predictive check 
+
+draws <- rstan::extract(normal_dist_sampling, pars = c("mu","sigma"))
+
+all_draws_df <- data.frame(draws)
+
+head(all_draws_df)
+
+nsamples<- 50
+
+yrep <- matrix(NA_real_, nrow = nsamples, ncol = list_bill_depth$N)
+
+set.seed(1234)
+
+chosen_samples <- sample(1:nrow(all_draws_df), size = nsamples, replace = FALSE)
+
+chosen_draws_df <- all_draws_df[chosen_samples,]
+
+for(r in 1:nsamples){
+  yrep[r,] <- rnorm(n = list_bill_depth$N, 
+                    mean = chosen_draws_df[r,"mu"],
+                    sd = chosen_draws_df[r,"sigma"])
+}
+
+yrep
+
+bayesplot::ppc_dens_overlay(y = list_bill_depth$measurements, yrep = yrep)
+
+# make penguins into number
+
+penguins_species_id <- penguins_nobillNA %>% 
+  select(species, bill_depth_mm) %>% 
+  mutate(species_id = as.numeric(species))
+
+
+penguins_species_model <- stan_model(file = "normal_spp_dist.stan")
+
+penguins_species_datalist <- list(N = nrow(penguins_species_id),
+                                  measurements = penguin_species_id$bill_depth_mm,
+                                  species_id = penguin_species_id$species_id)
+
+penguins_species_sampling <- rstan::sampling(object = penguins_species_model,
+                                             data = penguins_species_datalist,
+                                             refresh = 1000L,
+                                             iter = 2000L,
+                                             chains = 4L,
+                                             warmup = 1000L,
+                                             thin = 1L)
+penguins_species_sampling
+plot::mcmc_areas(penguins_species_sampling, pars = "mu")
+species_yrep_draws <- rstan::extract(penguins_species_sampling, 
+                                     pars = "yrep")
+
+
+bayesplot::ppc_dens_overlay(y = penguins_species_datalist$measurements, 
+                             yrep = head(species_yrep_draws$yrep, 100))
+
+penguins_species_sigma_model <- stan_model(file = "normal_spp_sigma_dist.stan")
+
+penguins_species_sigma_datalist <- list(N = nrow(penguins_species_id),
+                                        measurements = penguins_species_id$bill_depth_mm,
+                                        species_id = penguins_species_id$species_id)
+
+penguins_species_sigma_sampling <- rstan::sampling(object = penguins_species_sigma_model,
+                                             data = penguins_species_sigma_datalist,
+                                             refresh = 1000L,
+                                             iter = 2000L,
+                                             chains = 4L,
+                                             warmup = 1000L,
+                                             thin = 1L)
+
+bayesplot::mcmc_areas(penguins_species_sigma_sampling, 
+                      pars = c("sigma[1]","sigma[2]","sigma[3]"))
+
+bayesplot::mcmc_areas(penguins_species_sigma_sampling, 
+                      pars = c("mu[1]","mu[2]","mu[3]"))
+
+species_sigma_yrep_draws <- rstan::extract(penguins_species_sigma_sampling, 
+                                     pars = "yrep")
+
+bayesplot::ppc_dens_overlay(y = penguins_species_sigma_datalist$measurements, 
+                            yrep = head(species_sigma_yrep_draws$yrep, 100))
+
+

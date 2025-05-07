@@ -1,0 +1,105 @@
+library(palmerpenguins)
+library(ggplot2)
+suppressPackageStartupMessages(library(dplyr))
+library(tidybayes)
+# library(cmdstanr)
+suppressPackageStartupMessages(library(rstan))
+rstan_options("auto_write" = TRUE)
+options(mc.cores = parallel::detectCores())
+
+
+#are longer penguin bills also deeper
+
+ggplot(penguins) +
+  geom_point(aes(x = bill_length_mm, y = bill_depth_mm), alpha = 0.5)+
+  stat_smooth(aes(x = bill_length_mm, y = bill_depth_mm), method = "lm", se = FALSE)+smooth(aes(x = bill_length_mm, y = bill_depth_mm), method = "lm", 
+              se = TRUE)+
+  theme_classic()
+
+bill_length_centered <- with(penguins,
+                             bill_length_mm - mean(bill_length_mm, 
+                                                   na.rm = TRUE))
+
+some_bill_lengths <- seq(from = min(bill_length_centered,
+                                    na.rm = TRUE),
+                         to = max(bill_length_centered,
+                                  na.rm = TRUE),
+                         length.out = 10)
+
+slopes <- rnorm(7, mean = 0, sd = 0.5)
+inters <- rnorm(7, mean = 17, sd = 2)
+
+X <- cbind(1,some_bill_lengths)
+
+B <- rbind(inters, slopes)
+
+prior_mus <- X %*% B
+
+matplot(x = some_bill_lengths,
+        y = prior_mus, type = "l")
+
+prior_obs <- matrix(0, nrow = nrow(prior_mus), ncol = ncol(prior_mus))
+
+sigmas <- rexp(7, rate = 0.3)
+
+for(j in 1:ncol(prior_obs)){
+  prior_obs[,j] <- rnorm(n = nrow(prior_mus),
+                         mean = prior_mus[,j],
+                         sd = sigmas[j])
+}
+
+matplot(x = some_bill_lengths, y = prior_obs, type = "p")
+
+#make the prior_obs wider and then use ggplot facet to plot
+
+prior_obs_wide <- as.data.frame(prior_obs) %>%
+  pivot_longer(cols = everything(),
+               names_to = "draw",
+               values_to = "bill_depth_mm")
+
+penguins_model <- stan_model(file = "penguins_regression.stan")
+
+penguins_no_NA <- penguins |> 
+  tidyr::drop_na(bill_depth_mm, bill_length_mm) |> 
+  dplyr::mutate(
+    bill_length_center = bill_length_mm - mean(bill_length_mm))
+
+data_list <- with(penguins_no_NA,
+                  list(N = length(bill_length_center),
+                       bill_len = bill_length_center,
+                       bill_dep = bill_depth_mm,
+                       npost = 6,
+                       pred_values = modelr::seq_range(penguins_no_NA$bill_length_center, n = 6)
+                  ))
+
+
+penguins_sampling <- rstan::sampling(object = penguins_model,
+                                         data = data_list,
+                                         refresh = 1000L,
+                                         iter = 2000L,
+                                         chains = 4L,
+                                         warmup = 1000L,
+                                         thin = 1L)  
+
+bayesplot::mcmc_trace(penguins_sampling, pars = "slope")
+
+bayesplot::mcmc_areas(penguins_sampling, pars = c("intercept",
+                                                  "slope",
+                                                  "sigma"))
+yrep_draws <- rstan::extract(penguins_sampling,pars = "yrep")
+
+bayesplot::ppc_dens_overlay(y = data_list$bill_dep,
+                            yrep = head(yrep_draws$yrep,10))
+
+bill_posterior <- penguins_sampling %>% 
+  tidybayes::spread_rvars(post_bill_dep_avg[i], post_bill_dep_obs[i]) %>% 
+  mutate(bill_length = data_list$pred_values[i])
+
+ggplot(bill_posterior) +
+  tidybayes::stat_lineribbon(aes(x = bill_length, dist = post_bill_dep_avg)) +
+  theme_classic()
+
+ggplot(bill_posterior) +
+  tidybayes::stat_lineribbon(aes(x = bill_length, dist = post_bill_dep_obs)) +
+  theme_classic()
+                      

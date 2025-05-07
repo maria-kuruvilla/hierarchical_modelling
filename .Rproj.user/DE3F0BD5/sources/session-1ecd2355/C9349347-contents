@@ -1,0 +1,31 @@
+data {
+  int<lower=0> N;
+  vector[N] measurements;
+  array[N] int<lower=1,upper=3> species_id;
+}
+
+parameters {
+  vector[3] mu;
+  real<lower=0> sigma;
+  
+}
+
+model {
+  mu ~ normal(15, 3);
+  sigma ~ exponential(1);
+  //likelihood
+  measurements ~ normal(mu[species_id], sigma);
+  
+}
+//generate datasets from the sampled mean and sigma
+generated quantities {
+  vector[N] yrep;
+  for(i in 1:N){
+    yrep[i] = normal_rng(mu[species_id[i]],sigma);
+  }
+}
+
+
+
+
+

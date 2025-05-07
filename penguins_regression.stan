@@ -1,0 +1,45 @@
+data { 
+  int<lower=0> N;
+  vector[N] bill_len;
+  vector[N] bill_dep;
+  int<lower=0> npost;
+  vector[npost] pred_values;
+}
+
+parameters {
+  real intercept;
+  real slope;
+  real<lower=0> sigma;
+}
+
+model {
+  intercept ~ normal(17,2);
+  slope ~ normal(0,0.5);
+  sigma ~ exponential(0.3);
+  bill_dep ~ normal(intercept + slope*bill_len, sigma);
+}
+
+generated quantities {
+  vector[N] yrep;
+  vector[npost] post_bill_dep_obs;
+  vector[npost] post_bill_dep_avg;
+  
+  post_bill_dep_avg = intercept + slope*pred_values;
+  
+  for(i in 1:N){
+    yrep[i] = normal_rng(intercept + slope*bill_len[i], sigma);
+  }
+  
+  //make fake observations
+  for (j in 1:npost){
+    post_bill_dep_obs[j] = normal_rng(intercept + slope*pred_values[j], sigma);
+  }
+}
+
+
+
+
+
+
+  
+  

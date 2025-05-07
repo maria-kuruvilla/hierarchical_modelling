@@ -1,0 +1,26 @@
+{
+    "id": "CE4FF189",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/poisson_model.stan",
+    "project_path": "poisson_model.stan",
+    "type": "stan",
+    "hash": "775642951",
+    "contents": "",
+    "dirty": false,
+    "created": 1746541997335.0,
+    "source_on_save": false,
+    "relative_order": 11,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "25,0",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746551755,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746551755,
+    "read_only": false,
+    "read_only_alternatives": []
+}

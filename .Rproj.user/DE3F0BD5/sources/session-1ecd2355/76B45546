@@ -1,0 +1,26 @@
+{
+    "id": "76B45546",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/penguins_regression.stan",
+    "project_path": "penguins_regression.stan",
+    "type": "stan",
+    "hash": "2034535075",
+    "contents": "",
+    "dirty": false,
+    "created": 1746624374621.0,
+    "source_on_save": false,
+    "relative_order": 8,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "26,52",
+        "scrollLine": "22"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746627004,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746627004,
+    "read_only": false,
+    "read_only_alternatives": []
+}
