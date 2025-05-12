@@ -1,0 +1,50 @@
+
+# libraries ---------------------------------------------------------------
+
+library(tidyverse)
+library(here)
+
+
+
+
+
+# data processing ---------------------------------------------------------
+
+
+chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ersst.csv")) 
+
+viner <- chum_data %>% 
+  filter(River == "VINER SOUND CREEK") %>% 
+  select(BroodYear, Spawners, Recruits, ln_RS)
+
+
+simple_bh_model <- stan_model(file = "bh_simple_model.stan")
+
+viner_data_list <- list(
+  N = nrow(viner),
+  year = viner$BroodYear,
+  spawners = viner$Spawners,
+  ln_RS = viner$ln_RS,
+  Rk_mean = max(viner$Recruits),
+  Rk_sigma = max(viner$Recruits)*2
+)
+
+simple_bh_model_sampling <- rstan::sampling(simple_bh_model,
+                                                data = viner_data_list,
+                                            iter = 2000,
+                                            chains = 6,
+                                            warmup = 1000)
+
+bayesplot::mcmc_trace(simple_bh_model_sampling, pars = "alpha")
+
+bayesplot::mcmc_areas(simple_bh_model_sampling, pars = c("alpha"))
+
+yrep_draws <- rstan::extract(simple_bh_model_sampling,pars = "yrep")
+
+bayesplot::ppc_dens_overlay(y = viner_data_list$ln_RS,
+                            yrep = head(yrep_draws$yrep,100))
+
+
+
+
+

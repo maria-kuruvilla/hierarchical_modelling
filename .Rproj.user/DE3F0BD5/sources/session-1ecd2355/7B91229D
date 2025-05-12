@@ -1,0 +1,26 @@
+{
+    "id": "7B91229D",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/simple_fixed_effects_model.stan",
+    "project_path": "simple_fixed_effects_model.stan",
+    "type": "stan",
+    "hash": "2561799188",
+    "contents": "",
+    "dirty": false,
+    "created": 1746644936813.0,
+    "source_on_save": false,
+    "relative_order": 17,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "22,18",
+        "scrollLine": "10"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746645849,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746645849,
+    "read_only": false,
+    "read_only_alternatives": []
+}

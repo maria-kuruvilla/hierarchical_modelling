@@ -1,0 +1,149 @@
+suppressPackageStartupMessages(library(dplyr))
+library(ggplot2)
+library(tidyr)
+# library(cmdstanr)
+suppressPackageStartupMessages(library(rstan))
+rstan_options("auto_write" = TRUE)
+options(mc.cores = parallel::detectCores())
+library(tidybayes)
+
+data(mite, package = "vegan")
+data("mite.env", package = "vegan")
+
+
+# data prep ---------------------------------------------------------------
+
+mite_data_long <- bind_cols(mite.env, mite) %>% 
+  pivot_longer(Brachy:Trimalc2, names_to = "species",
+               values_to = "abundance")
+
+mite_data_long_transformed <- mite_data_long %>% 
+  mutate(pres_abs = as.numeric(abundance>0),
+         water_content = (WatrCont - mean(WatrCont))/100) %>% 
+  glimpse()
+
+mite_data_long_transformed %>% 
+  ggplot(aes(x = water_content, y = pres_abs)) + 
+  geom_point(alpha = 0.5) +
+  facet_wrap(~species)+
+  stat_smooth(method = "glm", 
+              method.args = list(family = "binomial"), 
+              color = "darkred")+
+  theme_classic()
+  
+  
+# separate data into species then fit model to each subset
+
+mite_many_glms <- mite_data_long_transformed %>% 
+  nest_by(species) %>% 
+  mutate(logistic_regressions = list(glm(pres_abs~water_content,
+                                         data = data,
+                                         family = "binomial")),
+         coefs = list(broom::tidy(logistic_regressions)))
+
+mite_many_glms$data[[1]] %>% 
+  View()
+
+#run model only on one species
+
+glm(pres_abs ~ 1 + water_content, data = mite_many_glms$data[[1]], 
+    family = "binomial")
+
+mite_many_glms_coefs <- mite_many_glms %>% 
+  select(-data, - logistic_regressions) %>% 
+  unnest(coefs)
+
+mite_many_glms_coefs %>% 
+  ggplot() + 
+  geom_pointrange(aes(x = estimate, y =species, 
+                      xmin = estimate -std.error,
+                      xmax = estimate + std.error))+
+  facet_wrap(~term, scales = "free_x")
+
+
+mite_many_glms_coefs %>% 
+  ggplot(aes(x = estimate))+
+  geom_histogram(binwidth = .5)+
+  facet_wrap(~term)
+
+
+mite_many_glms_coefs |> 
+  ggplot(aes(x = estimate)) + 
+  geom_histogram(binwidth = .5) + 
+  facet_wrap(~term, scales = "free")
+
+# fit stan model all_species_unpooled
+
+
+# mite_data_prep_stan -----------------------------------------------------
+
+mite_bin <- mite
+mite_bin[mite_bin>0] <- 1 # to make it a presence absence data
+
+mite_pres_abs_list <- list(
+  Nsites = nrow(mite_bin),
+  S = ncol(mite_bin),
+  x = with(mite.env, (WatrCont - mean(WatrCont))/100),
+  y = mite_bin
+)
+
+
+# model compilation and sampling ------------------------------------------
+
+all_species_unpooled <- stan_model(file = "all_species_unpooled.stan")
+
+all_species_unpooled_sampling <- rstan::sampling(all_species_unpooled,
+                                                 data = mite_pres_abs_list,
+                                                 iter = 2000,
+                                                 chains = 5)
+
+curve(plogis(x), xlim = c(-4,4))
+
+get_variables(all_species_unpooled_sampling)
+
+tidybayes::spread_rvars(all_species_unpooled_sampling, 
+                        intercept[species_id], slope[species_id]) %>% 
+  expand_grid(water = seq(-4,4,length.out = 10)) %>%
+  mutate(prob = posterior::rfun(plogis)(intercept + slope*water),
+         species = colnames(mite_bin)[species_id]) %>% 
+  ggplot(aes(x = water, dist = prob)) + 
+  tidybayes::stat_lineribbon() + 
+  facet_wrap(~species)
+                
+
+
+# hierarchical model with species -----------------------------------------
+
+# mite_data_long <- bind_cols(mite.env, mite) %>% 
+#   pivot_longer(Brachy:Trimalc2, names_to = "species",
+#                values_to = "abundance")
+# 
+# mite_data_long_transformed <- mite_data_long %>% 
+#   mutate(pres_abs = as.numeric(abundance>0),
+#          water_content = (WatrCont - mean(WatrCont))/100) %>% 
+#   glimpse()
+# 
+# # take long data
+# 
+# mite_data_long_species_id <- mite_data_long_transformed %>% 
+#   mutate(species_id = as.numeric(as.factor(species)))
+
+
+all_species_unpooled_hier <- stan_model(file = "all_species_unpooled_hier_slope_intercept.stan")
+
+all_species_unpooled_hier_sampling <- rstan::sampling(all_species_unpooled_hier,
+                                                 data = mite_pres_abs_list)
+
+
+bayesplot::mcmc_trace(all_species_unpooled_hier_sampling, pars = "mu_intercept" )
+
+tidybayes::spread_rvars(all_species_unpooled_hier_sampling, 
+                        intercept[species_id], slope[species_id]) %>% 
+  expand_grid(water = seq(-4,4,length.out = 10)) %>%
+  mutate(prob = posterior::rfun(plogis)(intercept + slope*water),
+         species = colnames(mite_bin)[species_id]) %>% 
+  ggplot(aes(x = water, dist = prob)) + 
+  tidybayes::stat_lineribbon() + 
+  facet_wrap(~species)
+
+

@@ -1,0 +1,22 @@
+data {
+  int<lower=0> Nsites;
+  int<lower=0> S;
+  vector[Nsites] x; //water
+  array[Nsites,S] int<lower=0,upper=1> y;
+  
+}
+
+parameters {
+  vector[S] intercept;
+  vector[S] slope;
+  
+}
+
+model {
+  for (s in 1:S){
+    y[,s] ~ bernoulli_logit(intercept[s]+slope[s]*x);
+  }
+  intercept ~ normal(0,3);
+  slope ~ normal(0,3);
+}
+

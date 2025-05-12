@@ -1,0 +1,26 @@
+{
+    "id": "AE281342",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/poisson_regression_hier_many_levels.stan",
+    "project_path": "poisson_regression_hier_many_levels.stan",
+    "type": "stan",
+    "hash": "3170018939",
+    "contents": "",
+    "dirty": true,
+    "created": 1746664173404.0,
+    "source_on_save": false,
+    "relative_order": 13,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "4,22",
+        "scrollLine": "13"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746665387,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746707594233,
+    "read_only": false,
+    "read_only_alternatives": []
+}

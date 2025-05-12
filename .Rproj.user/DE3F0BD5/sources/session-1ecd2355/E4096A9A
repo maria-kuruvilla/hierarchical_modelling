@@ -1,0 +1,26 @@
+{
+    "id": "E4096A9A",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/ricker_simple_hier_model.stan",
+    "project_path": "ricker_simple_hier_model.stan",
+    "type": "stan",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1746741311313.0,
+    "source_on_save": true,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "45,3",
+        "scrollLine": "25"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746819550,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746819550981,
+    "read_only": false,
+    "read_only_alternatives": []
+}

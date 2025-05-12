@@ -1,0 +1,26 @@
+{
+    "id": "633FD726",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/all_species_unpooled_hier_slope_intercept.stan",
+    "project_path": "all_species_unpooled_hier_slope_intercept.stan",
+    "type": "stan",
+    "hash": "3435005977",
+    "contents": "",
+    "dirty": false,
+    "created": 1746730382379.0,
+    "source_on_save": false,
+    "relative_order": 11,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "21,6",
+        "scrollLine": "12"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746735463,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746735463604,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,34 @@
+data {
+  int<lower=0> N;
+  vector[N] y;
+  int<lower=0> Ngroup;
+  array[N] int<lower=1,upper=Ngroup> group_id;
+}
+
+parameters {
+  real b_avg;
+  vector[Ngroup] b_group;
+  real<lower=0> sigma;
+  real<lower=0> sigma_group;
+}
+
+model {
+  sigma ~ exponential(1);
+  sigma_group ~ exponential(0.7);
+  b_group ~ normal(0,sigma_group);
+  b_avg ~ normal(5,2);
+  vector[N] mu = b_avg + b_group[group_id];
+  y ~ normal(mu, sigma);
+  
+}
+
+generated quantities {
+  vector[Ngroup] group_averages;
+  group_averages = b_avg + b_group;
+  vector[Ngroup] one_obs_per_group;
+  for(k in 1:Ngroup){
+    one_obs_per_group[k] = normal_rng(group_averages[k],sigma);
+  }
+  real new_b_group = normal_rng(0, sigma_group);
+  real one_obs_new_group = normal_rng(b_avg + new_b_group, sigma);
+}

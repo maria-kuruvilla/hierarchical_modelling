@@ -1,0 +1,71 @@
+library(palmerpenguins)
+suppressPackageStartupMessages(library(dplyr))
+library(ggplot2)
+library(tidyr)
+# library(cmdstanr)
+suppressPackageStartupMessages(library(rstan))
+rstan_options("auto_write" = TRUE)
+options(mc.cores = parallel::detectCores())
+library(tidybayes)
+#do penguins from different islands have different body mass?
+
+penguins_mass_data <- penguins %>% 
+  glimpse() %>% 
+  select(species, island, body_mass_g) %>% 
+  drop_na(body_mass_g) %>% 
+  unite(sp_island, species, island) %>% 
+  mutate(mass_kg = body_mass_g/1000)
+
+ggplot(penguins_mass_data) +
+  geom_jitter(aes(x = body_mass_g, y = sp_island), 
+              alpha = 0.2, height = 0.1)+
+  theme_classic()
+
+group_names <- penguins_mass_data %>% 
+  select(sp_island) %>% 
+  unique()
+
+group_names <- unique(penguins_mass_data$sp_island)
+
+group_nums <- seq_along(group_names)
+names(group_nums) <- group_names
+
+penguins_mass_data$group_id <- group_nums[penguins_mass_data$sp_island]
+
+penguins_group_list <- list(
+  N = nrow(penguins_mass_data),
+  y = penguins_mass_data$mass_kg,
+  Ngroup = max(penguins_mass_data$group_id),
+  group_id = penguins_mass_data$group_id
+)
+
+fixed_groups <- stan_model(file = "simple_fixed_effects_model.stan")
+
+fixed_group_samples <- sampling(fixed_groups, data = penguins_group_list)
+
+fixed_group_samples %>% 
+  gather_rvars(group_averages[group_id]) %>% 
+  mutate(sp_island = names(group_nums)[group_id]) %>% 
+  ggplot(aes(y= sp_island, dist = .value)) +
+  stat_pointinterval()+
+  geom_jitter(data=penguins_mass_data, aes(x = mass_kg, y=sp_island, 
+                                           color = sp_island),
+              alpha = 0.3, width  = 0, height = 0.3, inherit.aes = FALSE)+
+  theme_classic()
+ 
+fixed_group_samples %>% 
+  gather_rvars(one_obs_per_group[group_id]) %>% 
+  mutate(sp_island = names(group_nums)[group_id]) %>% 
+  ggplot(aes(y=sp_island, dist = .value)) +
+  stat_pointinterval() + 
+  geom_jitter(data = penguins_mass_data, aes(x= mass_kg, y =  sp_island,
+                                             color = sp_island),
+              alpha = 0.3, height  = 0.2, width = 0, inherit.aes = FALSE) + 
+  theme_classic()
+  
+  
+  
+  
+
+
+

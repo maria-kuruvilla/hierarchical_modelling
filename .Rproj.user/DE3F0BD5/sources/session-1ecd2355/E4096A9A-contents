@@ -1,0 +1,49 @@
+data {
+  int<lower=0> N;// number of observations
+  array[N] int<lower=1955, upper=2012> year; //brood year
+  vector[N] spawners; //spawners
+  vector[N] ln_RS; //log recruits per spawner, productivity
+  real Smax_mean;
+  real Smax_sigma;
+  
+}
+
+transformed data {
+  real log_Smax_pr_sigma;
+  real log_Smax_pr_mean;
+  log_Smax_pr_sigma = sqrt(log(1+((Smax_sigma)^2)/((Smax_mean)^2)));
+  log_Smax_pr_mean = log(Smax_mean) - 0.5*log_Smax_pr_sigma^2;
+}
+
+parameters {
+  real alpha;
+  real Smax;
+  real sigma;
+  
+}
+
+transformed parameters {
+  real b;
+  b = 1/Smax;
+}
+
+model {
+  vector[N] mu;
+  vector[N] e_t;
+  mu = alpha - b*spawners;
+  e_t = ln_RS - mu;
+  ln_RS ~ normal(mu, sigma);
+  alpha ~ normal(1.5,2);
+  Smax  ~ lognormal(log_Smax_pr_mean, log_Smax_pr_sigma);
+  
+}
+
+generated quantities {
+  vector[N] yrep;
+  
+  for(i in 1:N){
+    yrep[i] = normal_rng(alpha - b*spawners[i], sigma);
+  }
+  
+}
+

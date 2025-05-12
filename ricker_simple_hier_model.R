@@ -1,0 +1,61 @@
+
+# libraries ---------------------------------------------------------------
+
+library(tidyverse)
+library(here)
+
+
+
+
+
+# data processing ---------------------------------------------------------
+
+
+chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ersst.csv")) 
+
+chum_data %>%
+  select(River, BroodYear) %>% 
+  group_by(River) %>% 
+  summarise(num_years = n()) %>% 
+  filter(num_years > 50) %>% 
+View()
+
+viner <- chum_data %>% 
+  filter(River == "VINER SOUND CREEK") %>% 
+  select(BroodYear, Spawners, Recruits, ln_RS)
+
+glimpse(viner)
+
+viner$Spawners[which.max(viner$Recruits)]
+
+
+# compiling and sampling stan model ---------------------------------------
+
+simple_ricker_model <- stan_model(file = "ricker_simple_hier_model.stan")
+
+viner_data_list <- list(
+  N = nrow(viner),
+  year = viner$BroodYear,
+  spawners = viner$Spawners,
+  ln_RS = viner$ln_RS,
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2
+)
+
+simple_ricker_model_sampling <- rstan::sampling(simple_ricker_model,
+                                                data = viner_data_list)
+
+bayesplot::mcmc_trace(simple_ricker_model_sampling, pars = "alpha")
+
+
+bayesplot::mcmc_areas(simple_ricker_model_sampling, pars = c("alpha"))
+
+yrep_draws <- rstan::extract(simple_ricker_model_sampling,pars = "yrep")
+
+bayesplot::ppc_dens_overlay(y = viner_data_list$ln_RS,
+                            yrep = head(yrep_draws$yrep,100))
+
+
+
+
+

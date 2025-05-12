@@ -1,0 +1,26 @@
+{
+    "id": "3F1A5172",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/bh_simple_model.stan",
+    "project_path": "bh_simple_model.stan",
+    "type": "stan",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1746818342152.0,
+    "source_on_save": true,
+    "relative_order": 29,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "32,38",
+        "scrollLine": "26"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746819347,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746819347514,
+    "read_only": false,
+    "read_only_alternatives": []
+}
