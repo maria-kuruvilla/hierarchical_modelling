@@ -5,6 +5,8 @@ data {
   vector[N] ln_RS; //log recruits per spawner, productivity
   real Smax_mean;
   real Smax_sigma;
+  int<lower=0> N_predict;
+  vector[N_predict] S_predict;
   
 }
 
@@ -40,10 +42,12 @@ model {
 
 generated quantities {
   vector[N] yrep;
-  
+  vector[N_predict] ln_RS_predict;
   for(i in 1:N){
     yrep[i] = normal_rng(alpha - b*spawners[i], sigma);
   }
+  
+  ln_RS_predict = alpha - S_predict/Smax;
   
 }
 

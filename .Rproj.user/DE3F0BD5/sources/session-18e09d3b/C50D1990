@@ -1,0 +1,26 @@
+{
+    "id": "C50D1990",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/generate_bh_data.R",
+    "project_path": "generate_bh_data.R",
+    "type": "r_source",
+    "hash": "2041212250",
+    "contents": "",
+    "dirty": false,
+    "created": 1748991262200.0,
+    "source_on_save": false,
+    "relative_order": 8,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "187,0",
+        "scrollLine": "154"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1749154593,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1749154593825,
+    "read_only": false,
+    "read_only_alternatives": []
+}

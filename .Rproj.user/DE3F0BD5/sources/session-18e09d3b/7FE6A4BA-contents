@@ -1,0 +1,134 @@
+library(tidyverse)
+library(ggplot2)
+library(here)
+
+
+# set.seed(1234)
+
+n_people <- 21
+
+avg_birds <- runif(1, min = 0, max = 60)
+
+bird_count <- rpois(n = n_people, lambda = avg_birds)
+
+hist(bird_count)
+
+# prior predictive check
+set.seed(1234)
+n_simulation = 10
+
+bird_count_sim <- data.frame(
+  matrix(NA,nrow = n_people, ncol = n_simulation))
+
+colnames(bird_count_sim) <- paste0("sim_", 1:n_simulation)
+
+for (i in 1:n_simulation) {
+  avg_birds <- runif(1, min = 0, max = 60)
+  bird_count_sim$avg_birds[i] <- avg_birds
+  bird_count_sim[,i] <- rpois(n = n_people, lambda = avg_birds)
+}
+
+
+#histograms of all the simulations with ggplot
+
+bird_count_sim_long <- bird_count_sim %>%
+  pivot_longer(cols = -avg_birds, names_to = "simulation", values_to = "bird_count")
+
+
+ggplot(bird_count_sim_long) +
+  geom_histogram(aes(x = bird_count), binwidth = 5, alpha = 0.3, colour = "darkgreen") +
+  labs(title = "Poisson distribution",
+       x = "Number of birds",
+       y = "Count") +
+  theme_classic() +
+  facet_wrap(~round(avg_birds), ncol = 3, scales = "free_y") +
+  theme(legend.position = "right")
+
+
+#use stan model
+library(rstan)
+library(tidybayes)
+rstan_options("auto_write" = TRUE) # automatically saves the compiled at the same place as the stan file
+options(mc.cores = parallel::detectCores())
+
+poisson_simulation <- stan_model(file = "poisson_simulation.stan")
+
+poisson_simulation_datalist <- list(n_people = 21)
+
+poisson_sampling <- rstan::sampling(object = poisson_simulation,
+                data = poisson_simulation_datalist,
+                refresh = 1000L,
+                algorithm = "Fixed_param")
+
+library(tidybayes)
+
+pois_sim <- tidybayes::spread_draws(poisson_sampling, 
+                                    avg_birds_per_person,
+                                    bird_count[],
+                                    ndraws = 25, 
+                                    seed = 1234)
+#plotting the pois sim
+
+ggplot(pois_sim) +
+  geom_histogram(aes(x = bird_count), binwidth = 5, alpha = 0.3, colour = "darkgreen") +
+  geom_vline(aes(xintercept = avg_birds_per_person), color = "black", linetype = "dashed", size = 1) +
+  labs(title = "Poisson distribution",
+       x = "Number of birds",
+       y = "Count") +
+  theme_classic() +
+  facet_wrap(~.draw, ncol = 5, scales = "free_y") +
+  theme(legend.position = "right")
+
+
+#feed in data to poisson simulation
+
+poisson_simulation_w_data <- stan_model(file = "poisson_model.stan")
+
+n_people <- 21
+bird_count <- rpois(n = n_people, lambda = 10)
+
+poisson_simulation_datalist_w_data <- list(n_people = 21,
+                                    bird_count_observed = bird_count)
+
+poisson_sampling_w_data <- rstan::sampling(object = poisson_simulation_w_data,
+                                    data = poisson_simulation_datalist_w_data,
+                                    refresh = 1000L,
+                                    chains = 5,
+                                    iter = 2000,
+                                    warmup = 200)
+
+pois_sim_w_data <- tidybayes::spread_draws(poisson_sampling_w_data, 
+                                    avg_birds_per_person,
+                                    bird_count[],
+                                    ndraws = 25, 
+                                    seed = 1234)
+
+
+ggplot(pois_sim_w_data) +
+  geom_histogram(aes(x = bird_count), binwidth = 1, 
+                 alpha = 0.3, colour = "darkgreen") +
+  geom_vline(aes(xintercept = avg_birds_per_person), 
+             color = "black", linetype = "dashed", size = 1) +
+  labs(title = "Poisson distribution",
+       x = "Number of birds",
+       y = "Count") +
+  theme_classic() +
+  facet_wrap(~.draw, ncol = 5, scales = "free_y") +
+  theme(legend.position = "right")
+
+
+bayesplot::mcmc_areas(poisson_sampling_w_data, pars = "avg_birds_per_person",
+                      prob = 0.95, 
+                      point_est = "mean") +
+  geom_vline(xintercept = 10, 
+             color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Posterior distribution of average birds per person",
+       x = "Average birds per person",
+       y = "Density") +
+  theme_classic() +
+  theme(legend.position = "right")
+
+bird_count_draws <- rstan::extract(poisson_sampling_w_data, 
+                            pars = "bird_count")
+bayesplot::ppc_dens_overlay(y = bird_count, 
+                            yrep = head(bird_count_draws$bird_count, 100))

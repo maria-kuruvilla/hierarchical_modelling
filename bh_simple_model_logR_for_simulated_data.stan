@@ -1,0 +1,57 @@
+data {
+  int<lower=0> N;// number of observations
+  array[N] int<lower=0, upper=2025> year; //brood year
+  vector[N] spawners; //spawners
+  vector[N] logS;
+  vector[N] ln_RS; //log recruits per spawner, productivity
+  vector[N] logR;
+  real Rk_mean;
+  real Rk_sigma;
+  // int<lower=0> N_predict;
+  // vector[N_predict] S_predict;
+  real prior_alpha;
+  
+}
+
+transformed data {
+  real log_Rk_pr_sigma;
+  real log_Rk_pr_mean;
+  log_Rk_pr_sigma = sqrt(log(1+((Rk_sigma)^2)/((Rk_mean)^2)));
+  log_Rk_pr_mean = log(Rk_mean) - 0.5*log_Rk_pr_sigma^2;
+}
+
+parameters {
+  real alpha;
+  real Rk;
+  real sigma;
+  
+}
+
+// transformed parameters {
+//   real b;
+//   b = 1/Rk;
+// }
+
+model {
+  vector[N] mu;
+  vector[N] e_t;
+  mu = logS + alpha - log(1 + (exp(alpha)/Rk)*spawners);
+  // e_t = ln_RS - mu;
+  logR ~ normal(mu, sigma);
+  alpha ~ normal(prior_alpha,1);
+  Rk  ~ lognormal(log_Rk_pr_mean, log_Rk_pr_sigma);
+  
+}
+
+generated quantities {
+  // vector[N] yrep;
+  // vector[N_predict] ln_R_predict;
+  // vector[N_predict] R_predict;
+  // 
+  // for(i in 1:N){
+  //   yrep[i] = normal_rng(logS[i] + alpha - log(1 + (exp(alpha)/Rk)*spawners[i]), sigma);
+  // }
+  // ln_R_predict = log(S_predict) + alpha - log(1 + (exp(alpha)/Rk)*S_predict); 
+  // R_predict = exp(log(S_predict) +alpha - log(1 + (exp(alpha)/Rk)*S_predict)); 
+  // 
+}

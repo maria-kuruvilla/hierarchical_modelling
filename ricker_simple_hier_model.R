@@ -3,35 +3,47 @@
 
 library(tidyverse)
 library(here)
+library(rstan)
 
 
 
 
+# data prstan# data processing ---------------------------------------------------------
 
-# data processing ---------------------------------------------------------
 
+chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ocean_covariates.csv")) 
 
-chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ersst.csv")) 
-
+chum_data$River_n <- as.numeric(factor(chum_data$River_GFE_ID))
 chum_data %>%
   select(River, BroodYear) %>% 
   group_by(River) %>% 
   summarise(num_years = n()) %>% 
-  filter(num_years > 50) %>% 
-View()
+  filter(num_years > 50)
 
 viner <- chum_data %>% 
   filter(River == "VINER SOUND CREEK") %>% 
-  select(BroodYear, Spawners, Recruits, ln_RS)
+  mutate(logR = log(Recruits),
+         logS = log(Spawners)) %>%
+  select(BroodYear, Spawners, Recruits, ln_RS, logR, logS, River_n)
+
+viner %>% 
+  ggplot() + 
+  geom_point(aes(y = log(Recruits), x = Spawners))
 
 glimpse(viner)
 
 viner$Spawners[which.max(viner$Recruits)]
 
+chum_data %>% 
+  group_by(River) %>% 
+  summarize(Smax = Spawners[which.max(Recruits)])
 
 # compiling and sampling stan model ---------------------------------------
 
 simple_ricker_model <- stan_model(file = "ricker_simple_hier_model.stan")
+N_predict <- 100
+S_predict <- seq(1,max(viner$Spawners),
+                 length.out = N_predict)
 
 viner_data_list <- list(
   N = nrow(viner),
@@ -39,7 +51,9 @@ viner_data_list <- list(
   spawners = viner$Spawners,
   ln_RS = viner$ln_RS,
   Smax_mean = viner$Spawners[which.max(viner$Recruits)],
-  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2,
+  N_predict = N_predict,
+  S_predict = S_predict
 )
 
 simple_ricker_model_sampling <- rstan::sampling(simple_ricker_model,
@@ -56,6 +70,149 @@ bayesplot::ppc_dens_overlay(y = viner_data_list$ln_RS,
                             yrep = head(yrep_draws$yrep,100))
 
 
+simple_ricker_model_sampling %>% 
+  tidybayes::gather_rvars(ln_RS_predict[i]) %>% 
+  mutate(Spawners = S_predict) %>% 
+  ggplot(aes(x = Spawners, dist = .value)) +
+  geom_point(data = viner, aes(x = Spawners, y = ln_RS), alpha = 0.5, inherit.aes = FALSE) +
+  tidybayes::stat_lineribbon(alpha = 0.5)+
+  labs(title = "Ricker Model Fit to Viner Data using Bayesian",
+       x = "Spawners",
+       y = "ln(R/S)") +
+  theme(plot.title = element_text(size = 2),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 8),
+        legend.position = "none") + 
+  theme_classic()
+
+ggsave(here("figures", "viner_ricker_bayesian.png"),
+       width = 8, height = 5, dpi = 300, units = "in")
 
 
 
+N_predict <- nrow(viner)
+S_predict <- viner$Spawners
+
+viner_data_list2 <- list(
+  N = nrow(viner),
+  year = viner$BroodYear,
+  spawners = viner$Spawners,
+  ln_RS = viner$ln_RS,
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2,
+  N_predict = N_predict,
+  S_predict = S_predict
+)
+
+simple_ricker_model_sampling2 <- rstan::sampling(simple_ricker_model,
+                                                data = viner_data_list2, 
+                                                chains = 6,
+                                                iter = 2000)
+                                            
+
+
+# plot residuals
+
+# calculate median prediction for ln_RS_predict
+
+residuals <- viner$ln_RS - (as.data.frame(rstan::extract(simple_ricker_model_sampling2, pars = "ln_RS_predict")) %>% 
+  summarise_all(median) %>% unlist)
+
+residuals_df <- data.frame(observed_ln_RS = viner$ln_RS,
+                           residuals = residuals,
+                           predicted_ln_RS = (as.data.frame(rstan::extract(simple_ricker_model_sampling2, pars = "ln_RS_predict")) %>% 
+                                                summarise_all(median) %>% unlist))
+
+ggplot(residuals_df, aes(x = predicted_ln_RS, y = residuals)) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Residuals of Ricker Model Fit to Viner Data",
+       x = "ln(R/S)",
+       y = "Residuals") +
+  theme_classic()
+
+# log R model -------------------------------------------------------------
+
+
+logR_ricker_model <- stan_model(file = "ricker_simple_logR_model.stan")
+N_predict <- 100
+S_predict <- seq(1,max(viner$Spawners),
+                 length.out = N_predict)
+
+viner_data_list_logR <- list(
+  N = nrow(viner),
+  year = viner$BroodYear,
+  spawners = viner$Spawners,
+  logS = viner$logS,
+  ln_RS = viner$ln_RS,
+  logR = viner$logR,
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2,
+  N_predict = N_predict,
+  S_predict = S_predict
+)
+
+logR_ricker_model_sampling <- rstan::sampling(logR_ricker_model,
+                                              data = viner_data_list_logR,
+                                              chains = 6,
+                                              iter = 3500)
+
+logR_ricker_model_sampling %>% 
+  tidybayes::gather_rvars(ln_R_predict[i]) %>% 
+  mutate(Spawners = S_predict) %>% 
+  ggplot(aes(x = Spawners, dist = .value)) +
+  geom_point(data = viner, aes(x = Spawners, y = logR), alpha = 0.5, inherit.aes = FALSE) +
+  tidybayes::stat_lineribbon(alpha = 0.5)+
+  labs(title = "Ricker Model log R Fit to Viner Data using Bayesian",
+       x = "Spawners",
+       y = "log (Recruits)") +
+  theme(plot.title = element_text(size = 2),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 8),
+        legend.position = "none") + 
+  theme_classic()
+
+ggsave(here("figures", "Ricker_log_R_viner_bayesian.png"),
+       width = 8, height = 5, dpi = 300)
+
+N_predict <- nrow(viner)
+S_predict <- viner$Spawners
+
+viner_data_list_logR2 <- list(
+  N = nrow(viner),
+  year = viner$BroodYear,
+  spawners = viner$Spawners,
+  logS = viner$logS,
+  ln_RS = viner$ln_RS,
+  logR = viner$logR,
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2,
+  N_predict = N_predict,
+  S_predict = S_predict
+)
+
+logR_ricker_model_sampling2 <- rstan::sampling(logR_ricker_model,
+                                                data = viner_data_list_logR2, 
+                                                chains = 6,
+                                                iter = 2000)
+
+
+#plot residuals
+
+residuals_logR <- viner$logR - (as.data.frame(rstan::extract(logR_ricker_model_sampling2, pars = "ln_R_predict")) %>% 
+  summarise_all(median) %>% unlist)
+
+residuals_logR_df <- data.frame(observed_logR = viner$logR,
+                                 residuals = residuals_logR,
+                                 predicted_logR = (as.data.frame(rstan::extract(logR_ricker_model_sampling2, pars = "ln_R_predict")) %>% 
+                                                      summarise_all(median) %>% unlist))
+
+ggplot(residuals_logR_df, aes(x = predicted_logR, y = residuals)) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Residuals of Ricker Model log R Fit to Viner Data",
+       x = "log (Recruits)",
+       y = "Residuals") +
+  theme_classic()
+
+bayesplot::mcmc_areas(simple_ricker_model_sampling2, pars = c("sigma"))

@@ -1,10 +1,11 @@
 data {
   int<lower=0> N;// number of observations
-  array[N] int<lower=1955, upper=2012> year; //brood year
+  array[N] int<lower=0, upper=2025> year; //brood year
   vector[N] spawners; //spawners
   vector[N] ln_RS; //log recruits per spawner, productivity
   real Rk_mean;
   real Rk_sigma;
+  // real prior_alpha;
   
 }
 
@@ -33,7 +34,7 @@ model {
   mu = alpha - log(1 + (exp(alpha)/Rk)*spawners);
   e_t = ln_RS - mu;
   ln_RS ~ normal(mu, sigma);
-  alpha ~ normal(1.5,2);
+  alpha ~ normal(1.23,1);
   Rk  ~ lognormal(log_Rk_pr_mean, log_Rk_pr_sigma);
   
 }
