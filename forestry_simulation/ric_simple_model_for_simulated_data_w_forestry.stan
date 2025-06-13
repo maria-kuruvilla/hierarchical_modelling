@@ -1,12 +1,12 @@
 data {
   int<lower=0> N;// number of observations
-  array[N] int<lower=1955, upper=2012> year; //brood year
+  array[N] int<lower=0, upper=2025> year; //brood year
   vector[N] spawners; //spawners
   vector[N] ln_RS; //log recruits per spawner, productivity
+  vector[N] forestry;
   real Smax_mean;
   real Smax_sigma;
-  int<lower=0> N_predict;
-  vector[N_predict] S_predict;
+  real prior_alpha;
   
 }
 
@@ -18,37 +18,34 @@ transformed data {
 }
 
 parameters {
-  real alpha;
+  real<lower = 0, upper = 10> alpha;
   real Smax;
-  real<lower=0> sigma;
-  
+  real sigma;
+  real b_for;
 }
 
-transformed parameters {
-  real b;
-  b = 1/Smax;
-}
+// transformed parameters {
+//   real b;
+//   b = 1/Rk;
+// }
 
 model {
   vector[N] mu;
   vector[N] e_t;
-  mu = alpha - b*spawners;
+  mu = alpha - spawners/Smax + b_for*forestry;
   e_t = ln_RS - mu;
   ln_RS ~ normal(mu, sigma);
-  alpha ~ normal(1.5,2);
-  sigma ~ normal(1,1)
+  alpha ~ normal(prior_alpha,10);
   Smax  ~ lognormal(log_Smax_pr_mean, log_Smax_pr_sigma);
+  b_for ~ normal(0,1);
   
 }
 
 generated quantities {
   vector[N] yrep;
-  vector[N_predict] ln_RS_predict;
+
   for(i in 1:N){
-    yrep[i] = normal_rng(alpha - b*spawners[i], sigma);
+    yrep[i] = normal_rng(alpha - spawners[i]/Smax + b_for*forestry[i], sigma);
   }
   
-  ln_RS_predict = alpha - S_predict/Smax;
-  
 }
-

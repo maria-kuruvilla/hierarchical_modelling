@@ -2,6 +2,7 @@ data {
   int<lower=0> N;// number of observations
   array[N] int<lower=1955, upper=2012> year; //brood year
   vector[N] spawners; //spawners
+  vector[N] spawners_std;
   vector[N] ln_RS; //log recruits per spawner, productivity
   real Smax_mean;
   real Smax_sigma;
@@ -21,12 +22,14 @@ parameters {
   real alpha;
   real Smax;
   real<lower=0> sigma;
-  
+  real s_effect;
 }
 
 transformed parameters {
   real b;
   b = 1/Smax;
+  vector<lower=0>[N] sigma_modified;
+  sigma_modified = sigma + s_effect*spawners_std;
 }
 
 model {
@@ -34,9 +37,15 @@ model {
   vector[N] e_t;
   mu = alpha - b*spawners;
   e_t = ln_RS - mu;
-  ln_RS ~ normal(mu, sigma);
+  
+  
+  for(i in 1:N){
+    ln_RS ~ normal(mu, sigma_modified[i]);
+  }
+  
   alpha ~ normal(1.5,2);
-  sigma ~ normal(1,1)
+  sigma ~ normal(1,1);
+  s_effect ~ normal(-0.1,0.1);
   Smax  ~ lognormal(log_Smax_pr_mean, log_Smax_pr_sigma);
   
 }
@@ -45,7 +54,7 @@ generated quantities {
   vector[N] yrep;
   vector[N_predict] ln_RS_predict;
   for(i in 1:N){
-    yrep[i] = normal_rng(alpha - b*spawners[i], sigma);
+    yrep[i] = normal_rng(alpha - b*spawners[i], sigma_modified[i]);
   }
   
   ln_RS_predict = alpha - S_predict/Smax;

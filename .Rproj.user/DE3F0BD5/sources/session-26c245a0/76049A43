@@ -1,0 +1,26 @@
+{
+    "id": "76049A43",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/forestry_simulation/bh_simple_model_for_simulated_data_w_forestry.stan",
+    "project_path": "forestry_simulation/bh_simple_model_for_simulated_data_w_forestry.stan",
+    "type": "stan",
+    "hash": "3905114439",
+    "contents": "",
+    "dirty": false,
+    "created": 1749685590784.0,
+    "source_on_save": false,
+    "relative_order": 20,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "48,3",
+        "scrollLine": "15"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1749753775,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1749753775616,
+    "read_only": false,
+    "read_only_alternatives": []
+}

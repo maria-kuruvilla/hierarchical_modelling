@@ -1,0 +1,201 @@
+
+# libraries ---------------------------------------------------------------
+
+library(tidyverse)
+library(here)
+library(rstan)
+
+
+
+
+# data prstan# data processing ---------------------------------------------------------
+
+
+chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ocean_covariates.csv")) 
+
+chum_data$River_n <- as.numeric(factor(chum_data$River_GFE_ID))
+chum_data %>%
+  select(River, BroodYear) %>% 
+  group_by(River) %>% 
+  summarise(num_years = n()) %>% 
+  filter(num_years > 50)
+
+viner <- chum_data %>% 
+  filter(River == "VINER SOUND CREEK") %>% 
+  mutate(logR = log(Recruits),
+         logS = log(Spawners)) %>%
+  select(BroodYear, Spawners, Recruits, ln_RS, logR, logS, River_n)
+
+
+
+
+# Ricker simulate ---------------------------------------------------------
+
+ricker_sim_model <- stan_model(file = "ricker_simulate.stan")
+
+
+ricker_sim <- list(
+  N = nrow(viner),
+  spawners = viner$Spawners,
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]
+)
+
+
+
+
+ricker_sim_model_sampling <- rstan::sampling(ricker_sim_model,
+                                                data = ricker_sim,
+                                                iter = 1000,
+                                                chains = 4,
+                                                warmup = 200,algorithm = "Fixed_param")
+
+
+ricker_sim_results <- tidybayes::spread_draws(ricker_sim_model_sampling,
+                                              alpha,
+                                              sigma,
+                                              Smax,
+                                              ln_RS[],
+                                              ndraws = 20) %>% 
+  mutate(spawners = rep(viner$Spawners,20))
+
+# plot using geom_point, ln_RS vs spawners, label alpha and sigma value
+
+ricker_sim_results %>%
+  ggplot() +
+  geom_point(aes(x = spawners, y = ln_RS), alpha = 0.5, size = 2) +
+  geom_smooth(aes(x = spawners, y = ln_RS), method = "lm", color = "cadetblue") +
+  # geom_text(aes(x = max(spawners)*0.6, y = max(ln_RS)*0.6, 
+  #               label = paste("alpha =", round(alpha, 1), ", Smax = ", round(Smax, 0))),
+  #           size = 2.5, color = "salmon") +
+  labs(x = "Spawners", y = "log(Recruits/Spawners)") +
+  theme_classic() +
+  facet_wrap(vars(round(alpha,1),round(sigma,2),round(Smax,0)), scales = "free",
+             strip.position = c("top"),
+             labeller = label_wrap_gen(multi_line=FALSE))+
+  theme(strip.background = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+        )
+  
+ricker_sim_results %>%
+  ggplot() +
+  geom_point(aes(x = spawners, y = spawners*exp(ln_RS)), alpha = 0.5, size = 2) +
+  # geom_smooth(aes(x = spawners, y = ln_RS), method = "lm", color = "cadetblue") +
+  # geom_text(aes(x = max(spawners)*0.6, y = max(ln_RS)*0.6, 
+  #               label = paste("alpha =", round(alpha, 1), ", Smax = ", round(Smax, 0))),
+  #           size = 2.5, color = "salmon") +
+  labs(x = "Spawners", y = "log(Recruits/Spawners)") +
+  theme_classic() +
+  facet_wrap(vars(round(alpha,1),round(sigma,2)), scales = "free",
+             strip.position = c("top"),
+             labeller = label_wrap_gen(multi_line=FALSE))+
+  theme(strip.background = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+# ricker model with sigma as a function of spawners -----------------------
+
+
+ricker_sim_sigma_model <- stan_model(file = "ricker_simulate_sigma.stan")
+
+
+ricker_sim_sigma <- list(
+  N = nrow(viner),
+  spawners = viner$Spawners,
+  spawners_std = scale(viner$Spawners)[,1],
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]
+)
+
+ricker_sim_sigma_model_sampling <- rstan::sampling(ricker_sim_sigma_model,
+                                                data = ricker_sim_sigma,
+                                                iter = 1000,
+                                                chains = 4,
+                                                warmup = 200,algorithm = "Fixed_param")
+
+
+ricker_sim_sigma_results <- tidybayes::spread_draws(ricker_sim_sigma_model_sampling,
+                                              alpha,
+                                              sigma,
+                                              s_effect,
+                                              Smax,
+                                              ln_RS[],
+                                              ndraws = 20) %>% 
+  mutate(spawners = rep(viner$Spawners,20))
+
+
+ricker_sim_sigma_results %>%
+  ggplot() +
+  geom_point(aes(x = spawners, y = ln_RS), alpha = 0.5, size = 2) +
+  geom_smooth(aes(x = spawners, y = ln_RS), method = "lm", color = "cadetblue") +
+  # geom_text(aes(x = max(spawners)*0.6, y = max(ln_RS)*0.6, 
+  #               label = paste("alpha =", round(alpha, 1), ", Smax = ", round(Smax, 0))),
+  #           size = 2.5, color = "salmon") +
+  labs(x = "Spawners", y = "log(Recruits/Spawners)",
+       title = "Simulated data from Ricker model with alpha, sigma, and spawner effect on sigma")+
+  theme_classic() +
+  facet_wrap(vars(round(alpha,1),round(sigma,2),round(s_effect,1)), scales = "free",
+             strip.position = c("top"),
+             labeller = label_wrap_gen(multi_line=FALSE))+
+  theme(strip.background = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+
+
+
+
+
+# compiling and sampling stan model ---------------------------------------
+
+options(mc.cores = parallel::detectCores())
+simple_ricker_model_sigma <- stan_model(file = "ricker_simple_hier_model_sigma.stan")
+N_predict <- nrow(viner)
+S_predict <- viner$Spawners
+
+viner_data_list <- list(
+  N = nrow(viner),
+  year = viner$BroodYear,
+  spawners = viner$Spawners,
+  spawners_std = scale(viner$Spawners)[,1],
+  ln_RS = viner$ln_RS,
+  Smax_mean = viner$Spawners[which.max(viner$Recruits)],
+  Smax_sigma = viner$Spawners[which.max(viner$Recruits)]*2,
+  N_predict = N_predict,
+  S_predict = S_predict
+)
+
+simple_ricker_model_sigma_sampling <- rstan::sampling(simple_ricker_model_sigma,
+                                                data = viner_data_list,
+                                                warmup = 1000,
+                                                chains =6,
+                                                iter = 2000)
+
+bayesplot::mcmc_trace(simple_ricker_model_sigma_sampling, pars = "alpha")
+
+
+bayesplot::mcmc_areas(simple_ricker_model_sigma_sampling, pars = c("alpha"))
+
+#plot residuals = viner$ln_RS - ln_RS_predict vs ln_RS_predict
+
+ln_RS_predict <- rstan::extract(simple_ricker_model_sigma_sampling, pars = "ln_RS_predict")$ln_RS_predict
+
+residuals_sigma <- viner$ln_RS - (as.data.frame(rstan::extract(simple_ricker_model_sigma_sampling, pars = "ln_RS_predict")) %>% 
+                                           summarise_all(median) %>% unlist)
+
+residuals_sigma_df <- data.frame(observed_ln_RS = viner$ln_RS,
+                           residuals = residuals_sigma,
+                           predicted_ln_RS = (as.data.frame(rstan::extract(simple_ricker_model_sigma_sampling, pars = "ln_RS_predict")) %>% 
+                                                summarise_all(median) %>% unlist))
+
+ggplot(residuals_sigma_df, aes(x = predicted_ln_RS, y = residuals)) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Residuals of Ricker Model Fit to Viner Data",
+       x = "ln(R/S)",
+       y = "Residuals") +
+  theme_classic()
+
+

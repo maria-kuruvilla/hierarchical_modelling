@@ -1,0 +1,26 @@
+{
+    "id": "FB1125B2",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/ricker_simple_hier_model_sigma.stan",
+    "project_path": "ricker_simple_hier_model_sigma.stan",
+    "type": "stan",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1749160356405.0,
+    "source_on_save": true,
+    "relative_order": 14,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "31,49",
+        "scrollLine": "27"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1749246766,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1749246766829,
+    "read_only": false,
+    "read_only_alternatives": []
+}
