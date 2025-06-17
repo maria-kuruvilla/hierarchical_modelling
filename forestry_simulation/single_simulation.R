@@ -202,6 +202,9 @@ model_results_df <- model_results_df %>%
   mutate(data_model = factor(data_model, levels = c("Beverton-Holt", "Ricker")),
          fitting_model = factor(fitting_model, levels = c("Beverton-Holt", "Ricker")))
 
+model_results_df_alpha <- model_results_df %>% 
+  mutate(alpha = c(rep(c(rep(1.2,20),rep(5.4,20)),2)))
+
 pal=pnw_palette("Shuksan2",5)
 
 # display rhat values
@@ -241,6 +244,63 @@ ggplot(model_results_df %>% filter(parameter == "b_for"))+
   scale_fill_gradient2(name = "Error (%)", 
                        low = pal[1], mid = pal[3], high = pal[5], midpoint = 0) +
   # facet_wrap(~parameter, scales = "free") +
+  geom_text(aes(x = data_model, y = fitting_model, label = paste0("Rhat: ", round(Rhat, 4))), color = "black", size = 5) +
+  
+  labs(x = "Data Generating Model", y = "Fitting Model", title = "alpha = 1.2")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+ggplot(model_results_df_alpha %>% filter(alpha == 1.2))+
+  geom_tile(aes(x = data_model, y = fitting_model, fill = error), color = "white") +
+  # scale_fill_gradient2(name = "Relative Error (%)",
+  #                      low = "#35978f", mid = "gray", high = "#bf812d", midpoint = 0) +
+  scale_fill_gradient2(name = "Error (%)", 
+                       low = pal[1], mid = pal[3], high = pal[5], midpoint = 0) +
+  facet_wrap(~parameter, scales = "free") +
+  geom_text(aes(x = data_model, y = fitting_model, label = paste0("Rhat: ", round(Rhat, 4))), color = "black", size = 5) +
+  
+  labs(x = "Data Generating Model", y = "Fitting Model", title = "alpha = 1.2")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+ggplot(model_results_df_alpha %>% filter(alpha == 5.4))+
+  geom_tile(aes(x = data_model, y = fitting_model, fill = error), color = "white") +
+  # scale_fill_gradient2(name = "Relative Error (%)",
+  #                      low = "#35978f", mid = "gray", high = "#bf812d", midpoint = 0) +
+  scale_fill_gradient2(name = "Error (%)", 
+                       low = pal[1], mid = pal[3], high = pal[5], midpoint = 0) +
+  facet_wrap(~parameter, scales = "free") +
+  geom_text(aes(x = data_model, y = fitting_model, label = paste0("Rhat: ", round(Rhat, 4))), color = "black", size = 5) +
+  
+  labs(x = "Data Generating Model", y = "Fitting Model", title = "alpha = 1.2")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(model_results_df_alpha %>% filter(alpha == 5.4, parameter == "b_for"))+
+  geom_tile(aes(x = data_model, y = fitting_model, fill = error), color = "white") +
+  # scale_fill_gradient2(name = "Relative Error (%)",
+  #                      low = "#35978f", mid = "gray", high = "#bf812d", midpoint = 0) +
+  scale_fill_gradient2(name = "Error (%)", 
+                       low = pal[1], mid = pal[3], high = pal[5], midpoint = 0) +
+  facet_wrap(~parameter, scales = "free") +
+  geom_text(aes(x = data_model, y = fitting_model, label = paste0("Rhat: ", round(Rhat, 4))), color = "black", size = 5) +
+  
+  labs(x = "Data Generating Model", y = "Fitting Model", title = "alpha = 5.4")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(model_results_df_alpha %>% filter(alpha == 1.2, parameter == "b_for"))+
+  geom_tile(aes(x = data_model, y = fitting_model, fill = error), color = "white") +
+  # scale_fill_gradient2(name = "Relative Error (%)",
+  #                      low = "#35978f", mid = "gray", high = "#bf812d", midpoint = 0) +
+  scale_fill_gradient2(name = "Error (%)", 
+                       low = pal[1], mid = pal[3], high = pal[5], midpoint = 0) +
+  facet_wrap(~parameter, scales = "free") +
   geom_text(aes(x = data_model, y = fitting_model, label = paste0("Rhat: ", round(Rhat, 4))), color = "black", size = 5) +
   
   labs(x = "Data Generating Model", y = "Fitting Model", title = "alpha = 1.2")+
