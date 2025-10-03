@@ -1,0 +1,323 @@
+---
+title: "Profile Likelihood"
+author: 'Maria Kuruvilla'
+date: "July 2025"
+output:
+  
+  word_document:
+    toc: true
+  html_document:
+    collapsed: false
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+    smooth_scroll: true
+    theme: sandstone
+    toc: true
+    toc_float: true
+  pdf_document:
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+---
+
+```{=html}
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 13px;
+  }
+td {  /* Table  */
+  font-size: 13px;
+}
+h1.title {
+  font-size: 24px;
+  color: Black;
+}
+h1 { /* Header 1 */
+  font-size: 19px;
+  color: Black;
+}
+h2 { /* Header 2 */
+    font-size: 15px;
+  color: Black;
+}
+h3 { /* Header 3 */
+    font-size: 15px;
+  color: Black;
+}
+</style>
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(cache=FALSE)
+knitr::opts_chunk$set(fig.width=7, fig.height=5)
+options(max.print=23)
+library(here);library(dplyr); library(stringr)
+library(ggplot2)
+library(tidyverse)
+library(bayesplot)
+library(patchwork)
+library(hues)
+library(GGally)
+library(latex2exp)
+library(ggforce)
+library(PNWColors)
+
+pal <- PNWColors::pnw_palette("Starfish", 5)
+
+```
+
+```{r}
+
+chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ocean_covariates.csv")) 
+
+chum_data$River_n <- as.numeric(factor(chum_data$River_GFE_ID))
+
+
+carnation <- chum_data %>% 
+  filter(River == "CARNATION CREEK") %>% 
+  mutate(logR = log(Recruits),
+         logS = log(Spawners)) %>%
+  select(BroodYear, Spawners, Recruits, ln_RS, logR, logS, River_n,disturbedarea_prct_cs) %>% 
+  mutate(sqrt.CPD = sqrt(disturbedarea_prct_cs)) %>% 
+  mutate(sqrt.CPD.std = scale(sqrt.CPD)[,1]) 
+
+
+
+# simulate beverton holt data
+set.seed(123)
+
+bh_function_w_forestry_w_hier <- function(alpha_mean, n0, sigma_mean, Rk, years, forestry_effect_mean, forestry){
+  
+  alpha_sample <- rnorm(100, alpha_mean, sd = 1)
+  
+  alpha <- sample(alpha_sample[alpha_sample>0 & alpha_sample < 10], 1)
+  
+  sigma_sample <- rnorm(100, sigma_mean, 1)
+  
+  sigma <- sample(sigma_sample[sigma_sample>0 & sigma_sample < 2], 1)
+  
+  forestry_effect <- rnorm(1, forestry_effect_mean, 1)
+  
+  R_S = data.frame(S = rep(NA, years), R = rep(NA, years), year = 1:years, forestry = forestry, 
+                   sigma = rep(round(sigma,1), years), 
+                   forestry_effect = rep(round(forestry_effect,2), years), alpha = rep(round(alpha,2), years))
+  
+  for(t in 1:years){
+    epsilon <- rnorm(1, mean = 0, sd = sigma)
+    if(t==1){
+      R_S$S[1] <- n0
+      
+    } else{
+      R_S$S[t] <- R_S$R[t-1]
+      
+    }
+    R_S$R[t] <- R_S$S[t]*(exp(alpha)/(1 + exp(alpha)*R_S$S[t]/Rk))*exp(epsilon)*exp(forestry_effect*forestry[t])
+    
+  }
+  return(R_S)
+}
+
+alpha_mean <- 1.5
+n0 <- 100
+sigma_mean <- 1
+K <- 1000
+Rk <- round(exp(alpha_mean)*K/(exp(alpha_mean) -1),2)
+years <- nrow(carnation)
+forestry_effect_mean <- -0.2
+forestry <-  carnation$sqrt.CPD.std
+Smax <- round(K/alpha_mean,2)
+
+
+data <- bh_function_w_forestry_w_hier(alpha_mean, n0, sigma_mean, Smax, years = years, forestry_effect_mean, forestry)
+ 
+ggplot(data) + 
+  geom_point(aes(x = S, y = log(R/S), color = forestry), size = 2, alpha = 0.5) +
+  facet_wrap(~ paste("alpha",alpha)+ paste("sigma",sigma)+ paste("forestry effect",forestry_effect), scales = "free") + 
+  scale_color_gradient2(name = 'CPD std',
+                        low = '#35978f', mid = 'gray', high = '#bf812d', midpoint = 0) +
+  labs(#title = paste("alpha = ",mean(alpha), "sigma = ", mean(sigma), "forestry effect = ",mean(forestry_effect)),
+       x = "Spawners (S)",
+       y = "log(Recruits/Spawners) ") +
+  theme_classic()
+
+#plot as timeline
+
+ggplot(data) + 
+  geom_line(aes(x = year, y = S), color = "cadetblue") +
+  labs(x = "Year",
+       y = "Spawners (S) and Recruits (R)") +
+  theme_classic()
+
+
+
+
+```
+
+```{r}
+# calculate and plot the profile likelihood of
+# N(ln(R/S), sigma)
+
+bh_profile_likelihood <- function(data, alpha, sigma, forestry_effect){
+  
+  # calculate the log likelihood
+  n_log_likelihood <- function(data, alpha, sigma, forestry_effect, Rk){
+    n <- nrow(data)
+    mu <- alpha - log(1 + exp(alpha)*data$S/Rk) + forestry_effect*data$forestry
+    nll <- -0.5 * n * log(2 * pi * sigma^2) - sum((log(data$R/data$S) - mu)^2) / (2 * sigma^2)
+    return(nll)
+  }
+  
+  # full_fit <- optim(c(alpha = 1.2, Rmax = 500),)
+  
+  # create a grid of values for alpha and sigma
+  alpha_seq <- seq(0.1, 7, length.out = 10)
+  sigma_seq <- seq(1.2,1.2,1)
+  
+  # calculate the log likelihood for each combination of alpha and sigma
+  nll_matrix <- outer(alpha_seq, sigma_seq, Vectorize(function(a, s) n_log_likelihood(data, a, 1, 1.11, 1004)))
+  
+  # convert to a data frame for plotting
+  nll_df <- expand.grid(alpha = alpha_seq, sigma = sigma_seq)
+  nll_df$n_log_likelihood <- as.vector(nll_matrix)
+  
+  return(nll_df)
+}
+
+# plot with alpha
+
+bh_profile_likelihood_plot <- function(ll_df, alpha, sigma){
+  ggplot(ll_df, aes(x = alpha, y = log_likelihood)) +
+    geom_line(color = "cadetblue", size = 2, alpha = 0.5) +
+    geom_vline(xintercept = alpha, linetype = "dashed", color = "gray", size = 2) +
+    labs(title = paste("Profile Likelihood for alpha =", alpha, "and sigma =", sigma),
+         x = "Alpha",
+         y = "Log Likelihood") +
+    theme_minimal()
+}
+
+bh_profile_likelihood_plot(bh_profile_likelihood(data, alpha = 6.08, sigma = 0.8, forestry_effect = 0.46), 
+                           alpha = 1.2, sigma = 1.2)
+```
+
+```{r}
+
+# Do the same for Ricker model
+
+
+
+ric_function_w_forestry_w_hier <- function(alpha_mean, n0, sigma_sigma, Smax, years, forestry_effect_mean, forestry){
+  
+  
+  alpha_sample <- rnorm(100, alpha_mean, sd = 1)
+  
+  alpha <- sample(alpha_sample[alpha_sample>0 & alpha_sample < 10], 1)
+  
+  sigma_sample <- rnorm(100, sigma_mean, 1)
+  
+  sigma <- sample(sigma_sample[sigma_sample>0 & sigma_sample < 2], 1)
+  
+  forestry_effect <- rnorm(1, forestry_effect_mean, 1)
+  
+  R_S = data.frame(S = rep(NA, years), R = rep(NA, years), year = 1:years, forestry = forestry, 
+                   sigma = rep(round(sigma,1), years), 
+                   forestry_effect = rep(round(forestry_effect,2), years), alpha = rep(round(alpha,2), years))
+  
+  for(t in 1:years){
+    epsilon <- rnorm(1, mean = 0, sd = sigma)
+    if(t==1){
+      R_S$S[1] <- n0
+      
+    } else{
+      R_S$S[t] <- R_S$R[t-1]
+      
+    }
+    R_S$R[t] <- R_S$S[t]*(exp(alpha - R_S$S[t]/Smax))*exp(epsilon)*exp(forestry_effect*forestry[t])
+    
+  }
+  return(R_S)
+}
+
+alpha_mean <- 1.2
+n0 <- 100
+sigma_mean <- 1
+K <- 1000
+Rk <- round(exp(alpha_mean)*K/(exp(alpha_mean) -1),2)
+years <- nrow(carnation)
+forestry_effect_mean <- -0.2
+forestry <-  carnation$sqrt.CPD.std
+Smax <- round(K/alpha_mean,2)
+
+
+data <- ric_function_w_forestry_w_hier(alpha_mean, n0, sigma_mean, Smax, years = years, forestry_effect_mean, forestry)
+  
+#plot data R_S vs S
+
+ggplot(data) + 
+  geom_point(aes(x = S, y = log(R/S), color = forestry), size = 2, alpha = 0.5) +
+  facet_wrap(~ paste("alpha",alpha)+ paste("sigma",sigma)+ paste("forestry effect",forestry_effect), scales = "free") + 
+  scale_color_gradient2(name = 'CPD std',
+                        low = '#35978f', mid = 'gray', high = '#bf812d', midpoint = 0) +
+  labs(#title = paste("alpha = ",mean(alpha), "sigma = ", mean(sigma), "forestry effect = ",mean(forestry_effect)),
+       x = "Spawners (S)",
+       y = "log(Recruits/Spawners) ") +
+  theme_classic()
+
+#plot as timeline
+
+ggplot(data) + 
+  geom_line(aes(x = year, y = S), color = "cadetblue") +
+  labs(x = "Year",
+       y = "Spawners (S) and Recruits (R)") +
+  theme_classic()
+
+
+
+```
+
+```{r}
+# make function to calculate profile likelihood
+
+ric_profile_likelihood <- function(data, alpha, sigma, forestry_effect){
+  
+  # calculate the log likelihood
+  log_likelihood <- function(data, alpha, sigma, forestry_effect, Smax){
+    n <- nrow(data)
+    mu <- alpha - data$S/Smax + forestry_effect*data$forestry
+    ll <- -0.5 * n * log(2 * pi * sigma^2) - sum((log(data$R/data$S) - mu)^2) / (2 * sigma^2)
+    return(ll)
+  }
+  
+  # create a grid of values for alpha and sigma
+  alpha_seq <- seq(0.1, 7, length.out = 10)
+  sigma_seq <- seq(0.8,0.8,length.out = 1)
+  
+  # calculate the log likelihood for each combination of alpha and sigma
+  ll_matrix <- outer(alpha_seq, sigma_seq, Vectorize(function(a, s) log_likelihood(data, a, s, 0.8, 833)))
+  
+  # convert to a data frame for plotting
+  ll_df <- expand.grid(alpha = alpha_seq, sigma = sigma_seq)
+  ll_df$log_likelihood <- as.vector(ll_matrix)
+  
+  return(ll_df)
+}
+
+ric_profile_likelihood_plot <- function(ll_df, alpha, sigma){
+  ggplot(ll_df, aes(x = alpha, y = log_likelihood)) +
+    geom_line(color = "cadetblue", size = 2, alpha = 0.5) +
+    geom_vline(xintercept = alpha, linetype = "dashed", color = "gray", size = 2) +
+    labs(title = paste("Profile Likelihood for alpha =", alpha, "and sigma =", sigma),
+         x = "Alpha",
+         y = "Log Likelihood") +
+    theme_minimal()
+}
+
+
+
+ric_profile_likelihood_plot(ric_profile_likelihood(data, alpha = 1.2, sigma = 1.7, forestry_effect = -0.2), 
+                            alpha = 1.2, sigma = 1.7)
+
+
+```

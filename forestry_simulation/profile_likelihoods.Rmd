@@ -1,0 +1,629 @@
+
+---
+title: "Profile Likelihood for BH and Ricker models"
+author: 'Maria Kuruvilla'
+date: "Aug 2025"
+output:
+  
+  word_document:
+    toc: true
+  html_document:
+    collapsed: false
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+    smooth_scroll: true
+    theme: sandstone
+    toc: true
+    toc_float: true
+  pdf_document:
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+---
+
+
+```{=html}
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 13px;
+  }
+td {  /* Table  */
+  font-size: 13px;
+}
+h1.title {
+  font-size: 24px;
+  color: Black;
+}
+h1 { /* Header 1 */
+  font-size: 19px;
+  color: Black;
+}
+h2 { /* Header 2 */
+    font-size: 15px;
+  color: Black;
+}
+h3 { /* Header 3 */
+    font-size: 15px;
+  color: Black;
+}
+</style>
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(cache=FALSE)
+knitr::opts_chunk$set(fig.width=7, fig.height=5)
+options(max.print=23)
+library(here);library(dplyr); library(stringr)
+library(ggplot2)
+library(tidyverse)
+library(bayesplot)
+library(patchwork)
+library(hues)
+library(GGally)
+library(latex2exp)
+library(ggforce)
+library(PNWColors)
+
+pal <- PNWColors::pnw_palette("Starfish", 5)
+
+```
+
+
+## Carnation data
+
+```{r data, include=FALSE}
+
+chum_data <- read_csv(here("data", "chum_SR_20_hat_yr_w_ocean_covariates.csv")) 
+
+chum_data$River_n <- as.numeric(factor(chum_data$River_GFE_ID))
+
+
+carnation <- chum_data %>% 
+  filter(River == "CARNATION CREEK") %>% 
+  mutate(logR = log(Recruits),
+         logS = log(Spawners)) %>%
+  select(BroodYear, Spawners, Recruits, ln_RS, logR, logS, River_n,disturbedarea_prct_cs) %>% 
+  mutate(sqrt.CPD = sqrt(disturbedarea_prct_cs)) %>% 
+  mutate(sqrt.CPD.std = scale(sqrt.CPD)[,1]) 
+
+
+carnation_data <- data.frame(R = carnation$Recruits, S = carnation$Spawners)
+```
+
+
+```{r}
+ggplot(carnation) + 
+  geom_point(aes(x = Spawners, y = ln_RS), size = 2, alpha = 0.5, color = "#6E6362") +
+  # facet_wrap(~ paste("alpha",alpha)+ paste("sigma",sigma)+ paste("forestry effect",forestry_effect), scales = "free") + 
+  # scale_color_gradient2(name = 'CPD std',
+  #                       low = '#35978f', mid = 'gray', high = '#bf812d', midpoint = 0) +
+  # scale_color_manual(values = c("BH" = "#7F719F", "Ricker" = "#7CAE7A"))+
+  labs(title = "Carnation Data",
+       x = "Spawners (S)",
+       y = "log(Recruits/Spawners) ") +
+  theme_classic()
+
+
+```
+
+```{r}
+bh <- function(alpha, N, K){
+  Rk = exp(alpha)*K/(exp(alpha) - 1)
+  return(N * (exp(alpha) / (1 + exp(alpha) * N / Rk)))
+}
+
+ricker <- function(alpha, N, K){
+  Smax <- K/alpha
+  return(N * exp(alpha - N/Smax))
+}
+
+
+nLL <- function(pars, data, model = 'ricker', alpha_fixed = NULL){
+  
+  if(!is.null(alpha_fixed)){
+    alpha <- alpha_fixed
+    K <- pars[1]
+    sigma <- pars[2]
+  } else{
+    alpha <- pars[1]
+    K <- pars[2]
+    sigma <- pars[3]
+  }
+
+  
+  # print(alpha)
+  if(model == "ricker"){
+    
+    mu <- log(ricker(alpha, data$S, K)/data$S)
+  } else {
+    mu <- log(bh(alpha, data$S, K)/data$S)
+  }
+  # print(mu)
+  
+  
+  n <- nrow(data)
+  
+  # Negative log-likelihood
+  
+  nll_value <- (0.5*n*log(2*pi) + n*log(sigma) + sum((mu - log(data$R/data$S))^2)/(2*sigma^2))
+  # print(nll_value)
+  return(nll_value)
+  
+}
+
+
+#plot NLL for different values of alpha, keep K fixed
+
+alpha_seq <- seq(from =0.1, to = 10, length.out =100)
+
+K = 1000
+
+# data <- data.frame(S = bh_data$S, R = bh_data$R)
+# nll_df <- data.frame(alpha = alpha_seq, nll = NA_real_)
+# for(a in alpha_seq){
+#   nll_value <- nLL(c(a, 1000, 1), bh_data, model = 'bh')
+#   nll_df$nll[nll_df$alpha == a] <- nll_value
+# }
+
+#plot nll as a function of alpha
+# 
+# ggplot(nll_df, aes(alpha, nll)) + 
+#   geom_line(size = 1, alpha = 0.5)+
+#   labs(title = "Negative Log Likelihood for alpha",
+#        x = "Alpha",
+#        y = "Negative Log Likelihood") +
+#   theme_classic()
+# 
+# nll_df_ricker <- data.frame(alpha = alpha_seq, nll = NA_real_)
+# 
+# 
+# for(a in alpha_seq){
+#   nll_value <- nLL(c(a, 1000, 1), ricker_data, model = 'ricker')
+#   nll_df_ricker$nll[nll_df_ricker$alpha == a] <- nll_value
+# }
+# 
+# ggplot(nll_df_ricker, aes(alpha, nll)) + 
+#   geom_line(size = 1, alpha = 0.5)+
+#   labs(title = "Negative Log Likelihood for Ricker model",
+#        x = "Alpha",
+#        y = "Negative Log Likelihood") +
+#   theme_classic()
+
+
+
+```
+
+
+```{r}
+#optimize the NLL to get profile likelihood
+
+optimized_carnation <- optim(c(alpha = 1.2, K = 3000, sigma = 1), 
+      nLL, 
+      data = carnation_data, 
+      model = 'ricker',
+      # method = "L-BFGS-B",
+      # lower = c(0.1, 100, 0.1),
+      # upper = c(10, 2000, 10)
+)
+best_nll_carnation <- optimized_carnation$value
+
+alpha_seq <- seq(from = 0.1, to = 10, length.out = 100)
+
+profile_df_carnation <- data.frame(alpha = alpha_seq, nll = NA_real_)
+
+for(a in alpha_seq){
+  optimized_alpha <- optim(par = c(K = optimized_carnation$par[2],
+                                   sigma = optimized_carnation$par[3]),
+                           nLL,
+                           data = carnation_data,
+                           model = 'ricker',
+                           alpha_fixed = a)
+  
+    
+    
+  profile_df_carnation$nll[profile_df_carnation$alpha == a] <- optimized_alpha$value
+  
+}
+
+ggplot() +
+  geom_line(data = profile_df_carnation, aes(x = alpha, y = nll), size = 1, alpha = 0.5) +
+  #add horizontal line at confidence interval
+  geom_hline(yintercept = best_nll_carnation + qchisq(0.95, df = 1) / 2, linetype = "dashed", color = "gray") +
+  # geom_vline(xintercept = true_alpha, linetype = "dashed", color = "cadetblue") +
+  labs(title = "Profile Likelihood for Ricker model",
+       x = "Alpha",
+       y = "Negative Log Likelihood") +
+  theme_classic()
+
+
+
+```
+
+
+```{r}
+#optimize the NLL to get profile likelihood
+
+optimized_carnation_bh <- optim(c(alpha = 3, K = 3000, sigma = 1), 
+      nLL, 
+      data = carnation_data, 
+      model = 'bh',
+      # method = "L-BFGS-B",
+      # lower = c(0.1, 100, 0.1),
+      # upper = c(10, 2000, 10)
+)
+best_nll_carnation_bh <- optimized_carnation_bh$value
+
+alpha_seq <- seq(from = 0.1, to = 10, length.out = 100)
+
+profile_df_carnation_bh <- data.frame(alpha = alpha_seq, nll = NA_real_)
+
+for(a in alpha_seq){
+  optimized_alpha <- optim(par = c(K = optimized_carnation_bh$par[2],
+                                   sigma = optimized_carnation_bh$par[3]),
+                           nLL,
+                           data = carnation_data,
+                           model = 'bh',
+                           alpha_fixed = a)
+  
+    
+    
+  profile_df_carnation_bh$nll[profile_df_carnation_bh$alpha == a] <- optimized_alpha$value
+  
+}
+
+ggplot() +
+  geom_line(data = profile_df_carnation_bh, aes(x = alpha, y = nll), size = 1, alpha = 0.5) +
+  #add horizontal line at confidence interval
+  geom_hline(yintercept = best_nll_carnation_bh + qchisq(0.95, df = 1) / 2, linetype = "dashed", color = "gray") +
+  # geom_vline(xintercept = true_alpha, linetype = "dashed", color = "cadetblue") +
+  labs(title = "Profile Likelihood for BH model",
+       x = "Alpha",
+       y = "Negative Log Likelihood") +
+  theme_classic()
+
+
+
+```
+
+
+
+
+
+
+## Simulated data
+
+
+```{r}
+
+# simulate beverton holt data
+set.seed(123)
+
+time_steps <- nrow(carnation)
+
+true_alpha <- 1.2
+K <- 1000
+sigma <- 1
+n0 <- 100
+
+ricker_data <- data.frame(S = rep(NA, time_steps), R = rep(NA, time_steps), year = 1:time_steps)
+
+bh_data <- data.frame(S = rep(NA, time_steps), R = rep(NA, time_steps), year = 1:time_steps)
+
+
+for(t in 1:time_steps){
+  if(t == 1){
+    bh_data$S[t] <- n0
+    bh_data$R[t] <- bh(true_alpha, bh_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    ricker_data$S[t] <- n0
+    ricker_data$R[t] <- ricker(true_alpha, ricker_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    
+    
+  } else{
+    bh_data$S[t] <- bh_data$R[t-1]
+    bh_data$R[t] <- bh(true_alpha, bh_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    
+    ricker_data$S[t] <- ricker_data$R[t-1]
+    ricker_data$R[t] <- ricker(true_alpha, ricker_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    
+  }
+  
+  
+}
+
+bh_data$model <- "BH"
+ricker_data$model <- "Ricker"
+bh_ricker_data <- rbind(bh_data, ricker_data)
+
+ggplot(bh_ricker_data) + 
+  geom_point(aes(x = S, y = log(R/S), color = model), size = 2, alpha = 0.5) +
+  # facet_wrap(~ paste("alpha",alpha)+ paste("sigma",sigma)+ paste("forestry effect",forestry_effect), scales = "free") + 
+  # scale_color_gradient2(name = 'CPD std',
+  #                       low = '#35978f', mid = 'gray', high = '#bf812d', midpoint = 0) +
+  scale_color_manual(values = c("BH" = "#7F719F", "Ricker" = "#7CAE7A"))+
+  labs(title = paste("Simulated Data with alpha =", true_alpha, "and sigma =", sigma),
+       x = "Spawners (S)",
+       y = "log(Recruits/Spawners) ") +
+  theme_classic()
+
+
+
+
+```
+
+
+
+```{r}
+#optimize the NLL to get profile likelihood
+
+optimized <- optim(c(alpha = 1.2, K = 1000, sigma = 1), 
+      nLL, 
+      data = bh_data, 
+      model = 'bh',
+      # method = "L-BFGS-B",
+      # lower = c(0.1, 100, 0.1),
+      # upper = c(10, 2000, 10)
+)
+best_nll <- optimized$value
+
+alpha_seq <- seq(from = 0.1, to = 10, length.out = 100)
+
+profile_df <- data.frame(alpha = alpha_seq, nll = NA_real_)
+
+for(a in alpha_seq){
+  optimized_alpha <- optim(par = c(K = optimized$par[2],
+                                   sigma = optimized$par[3]),
+                           nLL,
+                           data = bh_data,
+                           model = 'bh',
+                           alpha_fixed = a)
+  
+    
+    
+  profile_df$nll[profile_df$alpha == a] <- optimized_alpha$value
+  
+}
+
+ggplot() +
+  geom_line(data = profile_df, aes(x = alpha, y = nll), size = 1, alpha = 0.5) +
+  #add horizontal line at confidence interval
+  geom_hline(yintercept = best_nll + qchisq(0.95, df = 1) / 2, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = true_alpha, linetype = "dashed", color = "cadetblue") +
+  labs(title = "Profile Likelihood for BH model",
+       x = "Alpha",
+       y = "Negative Log Likelihood") +
+  theme_classic()
+
+
+
+```
+
+
+
+
+
+
+```{r}
+#optimize the NLL to get profile likelihood
+
+optimized_ricker <- optim(c(alpha = 1.2, K = 1000, sigma = 1), 
+      nLL, 
+      data = ricker_data, 
+      model = 'ricker',
+      # method = "L-BFGS-B",
+      # lower = c(0.1, 100, 0.1),
+      # upper = c(10, 2000, 10)
+)
+
+best_nll_ricker <- optimized_ricker$value
+
+alpha_seq <- seq(from = 0.1, to = 10, length.out = 100)
+
+profile_df_ricker <- data.frame(alpha = alpha_seq, nll = NA_real_)
+
+for(a in alpha_seq){
+  optimized_alpha <- optim(par = c(K = optimized_ricker$par[2],
+                                   sigma = optimized_ricker$par[3]),
+                           nLL,
+                           data = ricker_data,
+                           model = 'ricker',
+                           alpha_fixed = a)
+  
+    
+    
+  profile_df_ricker$nll[profile_df_ricker$alpha == a] <- optimized_alpha$value
+  
+}
+
+true_alpha <- 1.2
+ggplot() +
+  geom_line(data = profile_df_ricker, aes(x = alpha, y = nll), size = 1, alpha = 0.5) +
+  geom_hline(yintercept = best_nll_ricker + qchisq(0.95, df = 1) / 2, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = true_alpha, linetype = "dashed", color = "cadetblue") +
+  labs(title = "Profile Likelihood for Ricker model",
+       x = "Alpha",
+       y = "Negative Log Likelihood") +
+  theme_classic()
+
+
+
+```
+
+
+
+
+
+```{r}
+
+# simulate beverton holt data
+set.seed(12345)
+bh <- function(alpha, N, K){
+  Rk = exp(alpha)*K/(exp(alpha) - 1)
+  return(N * (exp(alpha) / (1 + exp(alpha) * N / Rk)))
+}
+
+ricker <- function(alpha, N, K){
+  Smax <- K/alpha
+  return(N * exp(alpha - N/Smax))
+}
+
+time_steps <- nrow(carnation)
+
+true_alpha <- 0.5
+K <- 1000
+sigma <- 1.2
+n0 <- 100
+
+ricker_data <- data.frame(S = rep(NA, time_steps), R = rep(NA, time_steps), year = 1:time_steps)
+
+bh_data <- data.frame(S = rep(NA, time_steps), R = rep(NA, time_steps), year = 1:time_steps)
+
+
+for(t in 1:time_steps){
+  if(t == 1){
+    bh_data$S[t] <- n0
+    bh_data$R[t] <- bh(true_alpha, bh_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    ricker_data$S[t] <- n0
+    ricker_data$R[t] <- ricker(true_alpha, ricker_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    
+    
+  } else{
+    bh_data$S[t] <- bh_data$R[t-1]
+    bh_data$R[t] <- bh(true_alpha, bh_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    
+    ricker_data$S[t] <- ricker_data$R[t-1]
+    ricker_data$R[t] <- ricker(true_alpha, ricker_data$S[t], K)*exp(rnorm(1, mean = 0, sd = sigma))
+    
+  }
+  
+  
+}
+
+bh_data$model <- "BH"
+ricker_data$model <- "Ricker"
+bh_ricker_data <- rbind(bh_data, ricker_data)
+
+ggplot(bh_ricker_data) + 
+  geom_point(aes(x = S, y = log(R/S), color = model), size = 2, alpha = 0.5) +
+  # facet_wrap(~ paste("alpha",alpha)+ paste("sigma",sigma)+ paste("forestry effect",forestry_effect), scales = "free") + 
+  # scale_color_gradient2(name = 'CPD std',
+  #                       low = '#35978f', mid = 'gray', high = '#bf812d', midpoint = 0) +
+  scale_color_manual(values = c("BH" = "#7F719F", "Ricker" = "#7CAE7A"))+
+  labs(title = paste("Simulated Data with alpha =", true_alpha, "and sigma =", sigma),
+       x = "Spawners (S)",
+       y = "log(Recruits/Spawners) ") +
+  theme_classic()
+
+
+
+
+```
+
+
+
+
+```{r}
+#optimize the NLL to get profile likelihood
+
+optimized <- optim(c(alpha = 1.2, K = 1000, sigma = 1), 
+      nLL, 
+      data = bh_data, 
+      model = 'bh',
+      # method = "L-BFGS-B",
+      # lower = c(0.1, 100, 0.1),
+      # upper = c(10, 2000, 10)
+)
+best_nll <- optimized$value
+
+alpha_seq <- seq(from = 0.1, to = 10, length.out = 100)
+
+profile_df <- data.frame(alpha = alpha_seq, nll = NA_real_)
+
+for(a in alpha_seq){
+  optimized_alpha <- optim(par = c(K = optimized$par[2],
+                                   sigma = optimized$par[3]),
+                           nLL,
+                           data = bh_data,
+                           model = 'bh',
+                           alpha_fixed = a)
+  
+    
+    
+  profile_df$nll[profile_df$alpha == a] <- optimized_alpha$value
+  
+}
+
+ggplot() +
+  geom_line(data = profile_df, aes(x = alpha, y = nll), size = 1, alpha = 0.5) +
+  #add horizontal line at confidence interval
+  geom_hline(yintercept = best_nll + qchisq(0.95, df = 1) / 2, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = true_alpha, linetype = "dashed", color = "cadetblue")+
+  labs(title = "Profile Likelihood for BH model",
+       x = "Alpha",
+       y = "Negative Log Likelihood") +
+  annotate("text", x = true_alpha+0.25, y = 70, label = "True alpha", color = "cadetblue", angle = 90) +
+  annotate("text", x = 5, y = best_nll + qchisq(0.95, df = 1)/2 + 0.5 , label = "95% CI threshold", color = "gray", angle = 0) +
+  theme_classic()+
+  theme(legend.position = "right")
+
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+#optimize the NLL to get profile likelihood
+
+optimized_ricker <- optim(c(alpha = 1.2, K = 1000, sigma = 1), 
+      nLL, 
+      data = ricker_data, 
+      model = 'ricker',
+      # method = "L-BFGS-B",
+      # lower = c(0.1, 100, 0.1),
+      # upper = c(10, 2000, 10)
+)
+
+best_nll_ricker <- optimized_ricker$value
+
+alpha_seq <- seq(from = 0.1, to = 10, length.out = 100)
+
+profile_df_ricker <- data.frame(alpha = alpha_seq, nll = NA_real_)
+
+for(a in alpha_seq){
+  optimized_alpha <- optim(par = c(K = optimized_ricker$par[2],
+                                   sigma = optimized_ricker$par[3]),
+                           nLL,
+                           data = ricker_data,
+                           model = 'ricker',
+                           alpha_fixed = a)
+  
+    
+    
+  profile_df_ricker$nll[profile_df_ricker$alpha == a] <- optimized_alpha$value
+  
+}
+
+# true_alpha <- 1.2
+ggplot() +
+  geom_line(data = profile_df_ricker, aes(x = alpha, y = nll), size = 1, alpha = 0.5) +
+  geom_hline(yintercept = best_nll_ricker + qchisq(0.95, df = 1) / 2, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = true_alpha, linetype = "dashed", color = "cadetblue") +
+  labs(title = "Profile Likelihood for Ricker model",
+       x = "Alpha",
+       y = "Negative Log Likelihood") +
+  theme_classic()
+
+
+
+```
+
+

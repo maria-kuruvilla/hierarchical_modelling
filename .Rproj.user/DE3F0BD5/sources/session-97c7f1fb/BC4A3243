@@ -1,0 +1,26 @@
+{
+    "id": "BC4A3243",
+    "path": "C:/Users/mariakur/Documents/code/hierarchical_modelling/ricker_simple_hier_model.R",
+    "project_path": "ricker_simple_hier_model.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1757722782830.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "13,0",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1748990885,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1748990885,
+    "read_only": false,
+    "read_only_alternatives": []
+}

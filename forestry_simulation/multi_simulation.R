@@ -88,9 +88,9 @@ ric_function_w_forestry_w_hier <- function(alpha_mean, n0, sigma_sigma, Smax, ye
 }
 
 alpha_mean <- 5.4
-n0 <- 100
+n0 <- 1000
 sigma_mean <- 1
-K <- 1000
+K <- 1000000
 Rk <- round(exp(alpha_mean)*K/(exp(alpha_mean) -1),2)
 years <- nrow(carnation)
 forestry_effect_mean <- -0.2
@@ -295,7 +295,10 @@ pal=pnw_palette("Sailboat",5)
 
 ggplot(model_results_new %>% 
          filter(parameter == "b_for"), aes(x = b_for, y = estimate_mean)) +
-  geom_point(aes(color = sigma),alpha = 0.5, size = 2) +
+  # geom_point(aes(color = sigma),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin = estimate_lower, ymax = estimate_upper, 
+                      color = sigma), 
+                  alpha = 0.5, size = 0.5)+
   geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
   facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
   labs(x = "True covariate effect", y = "Estimated covariate effect") +
@@ -323,7 +326,9 @@ ggsave(here("forestry_simulation", "b_for_estimate_vs_true_rhat_col.png"), width
 
 ggplot(model_results_new %>% 
          filter(parameter == "alpha"), aes(x = alpha, y = estimate_mean)) +
-  geom_point(aes(color = sigma),alpha = 0.5, size = 2) +
+  # geom_point(aes(color = sigma),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin = estimate_lower, ymax = estimate_upper, 
+                      color = sigma), alpha = 0.5, size = 0.5)+
   geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
   # geom_text(aes(label = paste("r = ", round(cor(b_for, estimate_mean), 2))), 
   #           x = -0.5, y = 1.5, size = 3, color = "black") +
@@ -467,5 +472,194 @@ ggplot(model_results_high_alpha %>%
 #save figure
 
 ggsave(here("forestry_simulation", "alpha_estimate_vs_true_Rhat_col_high_alpha.png"), width = 6, height = 3)
+
+
+
+
+
+# mae separate columns for estimated mean of alpha, estimate mean of forestry and estimated mean of sigma
+
+model_results_high_alpha_new <- model_results_high_alpha %>% 
+  group_by(simulation, data_model, fitting_model) %>%
+  mutate(alpha_estimate = estimate_mean[parameter == "alpha"],
+         sigma_estimate = estimate_mean[parameter == "sigma"],
+         b_for_estimate = estimate_mean[parameter == "b_for"]) %>%
+  ungroup()
+
+
+ggplot(model_results_high_alpha_new %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_mean)) +
+  # geom_point(aes(color = sigma_estimate),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin = estimate_lower, ymax = estimate_upper, 
+                      color = sigma_estimate), alpha = 0.5, size = 0.5)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  scale_color_gradient2(name = 'estimated sigma',
+                        low = pal[2], mid = 'gray', high = pal[4], midpoint = 1) +
+  theme_classic() 
+
+pal=pnw_palette("Sailboat",5)
+ggplot(model_results_high_alpha_new %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_mean)) +
+  geom_point(aes(color = alpha_estimate),alpha = 0.5, size = 2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  scale_color_gradient2(name = 'Alpha',
+                        low = pal[2], mid = 'gray', high = pal[4], midpoint = 1) +
+  theme_classic() 
+
+
+
+
+
+
+
+
+
+
+
+# redo simulation with high alpha as well as high K
+
+generating_model = c("Ricker", "Beverton-Holt")
+fitting_model = c("Ricker", "Beverton-Holt")
+
+n_sim <- 200
+model_results_df_high_alpha_high_K <- data.frame(simulation = numeric(),
+                                                 data_model = character(),
+                                                 parameter = character(),
+                                                 true_value = numeric(),
+                                                 fitting_model = character(),
+                                                 estimate_mean = numeric(),
+                                                 estimate_lower = numeric(),
+                                                 estimate_upper = numeric(),
+                                                 Rhat = numeric(),
+                                                 error = numeric())
+
+
+last_nsim <- 0
+
+for(i in (last_nsim+1):n_sim){
+  print(i)
+  data_model <- sample(generating_model,1)
+  # print(data_model)
+  set.seed(123+i)
+  alpha_mean <- 5.4
+  n0 <- 100
+  sigma_mean <- 1
+  K <- 10000
+  Rk <- round(exp(alpha_mean)*K/(exp(alpha_mean) -1),2)
+  years <- nrow(carnation)
+  forestry_effect_mean <- -0.2
+  forestry <-  carnation$sqrt.CPD.std
+  Smax <- round(K/alpha_mean,2)
+  
+  if(data_model == "Beverton-Holt"){
+    
+    data <- bh_function_w_forestry_w_hier(alpha_mean, n0, sigma_mean, Rk, years = years, forestry_effect_mean, forestry)
+    
+    
+    
+  } else if(data_model == "Ricker"){
+    
+    data <- ric_function_w_forestry_w_hier(alpha_mean, n0, sigma_mean, Rk, years = years, forestry_effect_mean, forestry)
+    
+  }
+  
+  #check if any spawners<1
+  
+  if(any(data$S < 1)){
+    next
+  }
+  
+  
+  
+  data_list <- list(
+    N = nrow(data),
+    year = data$year,
+    spawners = data$S,
+    ln_RS = log(data$R/data$S),
+    forestry = data$forestry,
+    Rk_mean = max(data$R),
+    Rk_sigma = max(data$R)*2,
+    Smax_mean = data$S[which.max(data$R)],
+    Smax_sigma = data$S[which.max(data$R)]*2,
+    prior_alpha = 5
+  )
+  
+  for(fit_model in fitting_model){
+    
+    
+    set.seed(124+i)
+    
+    if(fit_model == "Beverton-Holt"){
+      
+      model_w_forestry_sampling <- rstan::sampling(sim_bh_model_w_forestry,
+                                                   data = data_list,
+                                                   iter = 2000,
+                                                   chains = 6,
+                                                   warmup = 1000,
+                                                   verbose = FALSE)
+      
+      
+      
+      
+    } else if(fit_model == "Ricker"){
+      
+      model_w_forestry_sampling <- rstan::sampling(sim_ric_model_w_forestry,
+                                                   data = data_list,
+                                                   iter = 2000,
+                                                   chains = 6,
+                                                   warmup = 1000,
+                                                   verbose = FALSE)
+      
+      
+      
+      
+      
+      
+    }
+    
+    Rhat_values <- data.frame(Rhat = round(summary(model_w_forestry_sampling)$summary[1:4,"Rhat"],3)) %>% 
+      rownames_to_column("parameter")
+    
+    true_values <- data %>% 
+      group_by(sigma,forestry_effect, alpha) %>% 
+      summarize(sigma = mean(sigma), forestry_effect = mean(forestry_effect), alpha = mean(alpha)) %>% 
+      ungroup() %>% 
+      rename(sigma = sigma, b_for = forestry_effect, alpha = alpha) %>% 
+      pivot_longer(cols = c(sigma, alpha, b_for), names_to = "parameter", values_to = "true_value") %>% 
+      left_join(Rhat_values, by = "parameter")
+    
+    print(true_values)
+    
+    model_w_forestry_results <- tidybayes::spread_draws(model_w_forestry_sampling, alpha, b_for, sigma) %>%
+      mutate(fitting_model = fit_model, simulation = i) %>%
+      select(fitting_model, alpha, b_for, sigma, simulation) %>% 
+      pivot_longer(cols = c(alpha, b_for, sigma), names_to = "parameter", values_to = "value") %>%
+      group_by(fitting_model, parameter, simulation) %>%
+      summarise(
+        estimate_mean = round(mean(value),2),
+        estimate_lower = round(quantile(value, 0.025),2),
+        estimate_upper = round(quantile(value, 0.975),2)
+      ) %>%
+      ungroup() %>% 
+      
+      left_join(true_values, by = "parameter") %>% 
+      mutate(data_model = data_model) %>% 
+      mutate(error = 100*(estimate_mean - true_value)/true_value)
+    
+    model_results_df_high_alpha_high_K <- model_results_df_high_alpha_high_K %>%
+      bind_rows(model_w_forestry_results)
+  }
+  
+  
+}
+
+model_results_df_high_alpha_high_K %>% 
+  View()
+
+last_nsim <- max(model_results_df_high_alpha_high_K$simulation)
 
 

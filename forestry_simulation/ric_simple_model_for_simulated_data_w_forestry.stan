@@ -42,10 +42,10 @@ model {
 }
 
 generated quantities {
-  vector[N] yrep;
-
-  for(i in 1:N){
-    yrep[i] = normal_rng(alpha - spawners[i]/Smax + b_for*forestry[i], sigma);
-  }
+  // vector[N] yrep;
+  // 
+  // for(i in 1:N){
+  //   yrep[i] = normal_rng(alpha - spawners[i]/Smax + b_for*forestry[i], sigma);
+  // }
   
 }

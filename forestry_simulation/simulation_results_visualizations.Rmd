@@ -1,0 +1,316 @@
+
+---
+title: "Simulations of Stock-Recruit Data with Forestry"
+author: 'Maria Kuruvilla'
+date: "June 2025"
+output:
+  
+  word_document:
+    toc: true
+  html_document:
+    collapsed: false
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+    smooth_scroll: true
+    theme: sandstone
+    toc: true
+    toc_float: true
+  pdf_document:
+    fig_caption: true
+    highlight: espresso
+    number_sections: true
+---
+
+
+
+```{=html}
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 13px;
+  }
+td {  /* Table  */
+  font-size: 13px;
+}
+h1.title {
+  font-size: 24px;
+  color: Black;
+}
+h1 { /* Header 1 */
+  font-size: 19px;
+  color: Black;
+}
+h2 { /* Header 2 */
+    font-size: 15px;
+  color: Black;
+}
+h3 { /* Header 3 */
+    font-size: 15px;
+  color: Black;
+}
+</style>
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(cache=FALSE)
+knitr::opts_chunk$set(fig.width=7, fig.height=5)
+options(max.print=23)
+library(here);library(dplyr); library(stringr)
+library(ggplot2)
+library(tidyverse)
+library(bayesplot)
+library(patchwork)
+library(hues)
+library(GGally)
+library(latex2exp)
+library(ggforce)
+library(PNWColors)
+
+pal <- PNWColors::pnw_palette("Starfish", 5)
+
+```
+
+
+
+```{r include=FALSE}
+#read data
+
+simulation_results <- read.csv(here("forestry_simulation",
+                      "output",
+                      "simulation_fitting_results_w_carnation_spawner.csv"))
+
+
+simulation_results0 <- read.csv(here("forestry_simulation",
+                                     "output",
+                                     "model_200_simulation_w_median_fitting_result.csv"))
+  
+
+
+
+```
+
+
+# Goal 
+
+Determine the accuracy of the estimates of Stock-Recruitment model parameters by using simulated data from Beverton-Holt and Ricker models.
+
+## Generating Recruit Time Series
+
+We generated data using the Beverton Holt equation and the Ricker equation for 50 years and with an initial population size of 100.
+
+### Beverton-Holt Equation
+
+$N_{t+1} =  N_t \ \frac{e^{\alpha + \beta Forestry + \epsilon}}{1 + \frac{e^{\alpha}N_t}{R_k}} \ $
+
+$R_K = \frac{K}{e^{\alpha}-1}$
+
+### Ricker Equation
+
+$N_{t+1} = N_t \ e^{\alpha - \frac{N_{t}}{S_{max}} + \beta Forestry + \epsilon}$
+
+$S_{max} = \frac{K}{\alpha}$
+
+$\epsilon \sim N(0,\sigma)$
+
+We used $K = 1000$, $Forestry = \sqrt{CPD}$ of Carnation Creek and varied $\alpha$, $\sigma$, and $\beta$.
+
+We discarded data in which the population crashed ($<1$). This occurred when $\alpha$ was high in the Ricker model. We fit the model with normal prior for $\alpha \sim N(5,10)$ and $0<\alpha<10$ constraint.
+
+
+```{r}
+
+
+ggplot(simulation_results0 %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = alpha), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'alpha',
+                        colors = pal)+
+  theme_classic() 
+
+
+```
+
+When the Ricker model is fit to Beverton-Holt data (and perhaps vice versa), the effect of a covariate is underestimated. 
+
+
+```{r }
+
+ggplot(simulation_results0 %>% 
+         filter(parameter == "alpha"), aes(x = alpha, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = b_for_estimate), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True alpha", y = "Estimated alpha") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'Estimated\ncovariate\neffect',
+                        colors = pal)+
+  theme_classic() 
+
+```
+
+The Ricker model is able to estimate $\alpha$ from data generated from the Ricker model. The Ricker model underestimates $\alpha$ values from Beverton-Holt data. The Beverton-Holt model is unable to estimate $\alpha$ precisely. 
+
+
+
+## Generating $ln(\frac{R}{S})$ data
+
+To overcome the chaotic dynamics of the Ricker model at high values of $\alpha$, we generated $\ln(\frac{R}{S})$ data by using empirical spawner data from Carnation Creek.
+
+
+### Beverton-Holt Equation
+
+$\ln(\frac{R}{S}) = e^{\alpha} - \ln(1 + \frac{e^{\alpha} S}{R_k}) + \beta Forestry + \epsilon$
+
+$R_K = \frac{K}{e^{\alpha}-1}$
+
+### Ricker Equation
+
+
+$\ln(\frac{R}{S}) = \alpha - \frac{S}{S_{max}} + \beta Forestry + \epsilon$
+
+$S_{max} = \frac{K}{\alpha}$
+
+$\epsilon \sim N(0,\sigma)$
+
+
+```{r eval=FALSE, include=FALSE}
+
+
+ggplot(simulation_results %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = alpha), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'alpha',
+                        colors = pal)+
+  theme_classic() 
+
+
+```
+
+
+```{r}
+
+
+ggplot(simulation_results %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = alpha_estimate), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'Estimated\nalpha',
+                        colors = pal)+
+  theme_classic() 
+
+
+```
+
+The estimate of covariate effect is usually accurate. It can have high levels of uncertainty when fitting Beverton-Holt data to Ricker data which coincides with high estimated $\alpha$ values.
+
+
+
+
+```{r eval=FALSE, fig.height=4, fig.width=6, include=FALSE}
+
+
+ggplot(simulation_results %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = sigma), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'Sigma',
+                        colors = pal)+
+  theme_classic() 
+
+
+```
+
+
+```{r}
+
+
+ggplot(simulation_results %>% 
+         filter(parameter == "b_for"), aes(x = b_for, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = sigma_estimate), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True covariate effect", y = "Estimated covariate effect") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'Estimated\nsigma',
+                        colors = pal)+
+  theme_classic() 
+
+
+```
+
+The estimate of covariate effect is usually accurate. It can have high levels of uncertainty when fitting Beverton-Holt data to Ricker data which coincides with high estimated $\sigma$ values.
+
+
+```{r }
+
+ggplot(simulation_results %>% 
+         filter(parameter == "alpha"), aes(x = alpha, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = b_for_estimate), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True alpha", y = "Estimated alpha") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'Estimated\ncovariate\neffect',
+                        colors = pal)+
+  theme_classic() 
+
+```
+
+
+The Ricker model is able to estimate $\alpha$ from data generated from the Ricker model. The Ricker model underestimates $\alpha$ values from Beverton-Holt data. The Beverton-Holt model is unable to estimate $\alpha$ precisely. 
+
+
+
+```{r eval=FALSE, fig.height=4, fig.width=6, include=FALSE}
+
+ggplot(simulation_results %>% 
+         filter(parameter == "alpha"), aes(x = alpha, y = estimate_median)) +
+  # geom_point(aes(color = alpha),alpha = 0.5, size = 2) +
+  geom_pointrange(aes(ymin= estimate_lower, ymax = estimate_upper, color = sigma), size = 0.2, alpha = 0.3)+
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~ paste("Data model: ",data_model) + paste("Fitting model: ",fitting_model)) +
+  labs(x = "True alpha", y = "Estimated alpha") +
+  # scale_color_gradient2(name = 'alpha',
+  #                       low = pal[2], mid = 'gray', high = pal[4], midpoint = 5) +
+  scale_color_gradientn(name = 'Sigma',
+                        colors = pal)+
+  theme_classic() 
+
+```
+
+
+
+
+
+

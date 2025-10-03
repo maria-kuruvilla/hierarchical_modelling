@@ -6,6 +6,7 @@ data {
   real Smax_mean;
   real Smax_sigma;
   vector[N] forestry;
+  real alpha_mean;
   // int<lower=0> N_predict;
   // vector[N_predict] S_predict;
   
@@ -16,7 +17,7 @@ generated quantities {
   
   real<lower=0,upper=10> alpha;
   
-  alpha = normal_rng(5,10);
+  alpha = normal_rng(alpha_mean,2);
   
   real<lower=0> sigma;
   
@@ -24,7 +25,7 @@ generated quantities {
   
   real b_for;
   
-  b_for = normal_rng(-0.2, 0.25);
+  b_for = normal_rng(-0.2, 1);
   
   real log_Smax_pr_sigma;
   real log_Smax_pr_mean;

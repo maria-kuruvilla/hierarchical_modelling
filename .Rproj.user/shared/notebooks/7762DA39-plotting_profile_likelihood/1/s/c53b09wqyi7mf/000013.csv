@@ -1,0 +1,8 @@
+"0",""
+"0","#plot as timeline"
+"0",""
+"0","ggplot(data) + "
+"0","  geom_line(aes(x = year, y = S), color = ""cadetblue"") +"
+"0","  labs(x = ""Year"","
+"0","       y = ""Spawners (S) and Recruits (R)"") +"
+"0","  theme_classic()"

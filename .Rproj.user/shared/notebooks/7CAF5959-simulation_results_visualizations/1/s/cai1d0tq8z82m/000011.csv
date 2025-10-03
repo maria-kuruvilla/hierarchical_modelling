@@ -1,0 +1,11 @@
+"0","simulation_results0 <- read.csv(here(""forestry_simulation"",
+                                     ""output"",
+                                     ""model_200_simulation_w_median_fitting_result.csv"")) %>% 
+  
+
+
+
+```
+"
+"2","Error: attempt to use zero-length variable name
+"
